@@ -6,6 +6,7 @@
 #define OP_SUB 0x12
 #define OP_MUL 0x13
 #define OP_DIV 0x14
+#define PRUEBA 9999
 
 
 int main() {
