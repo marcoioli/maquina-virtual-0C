@@ -9,6 +9,11 @@
 #define PRUEBA 9999
 
 
+int getvalue(op) {
+  int value = op & 0x00FFFFFF;
+  return value;
+}
+
 int main() {
     printf("Prueba commit");
     return 0;
