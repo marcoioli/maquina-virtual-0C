@@ -7,10 +7,10 @@
 #define OP_MUL 0x13
 #define OP_DIV 0x14
 #define PRUEBA 9999
-
+#define MASK 0x00FFFFFF
 
 int getvalue(op) {
-  int value = op & 0x00FFFFFF;
+  int value = op & MASK;
   return value;
 }
 
