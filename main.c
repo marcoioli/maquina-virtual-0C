@@ -66,11 +66,16 @@ typedef enum {
   OP_MEMORIA = 0x03;
 } TipoOperando;
 
-
 typedef struct  {
   TipoOperando tipoOp;
   uint32_t valor; //2 bytes son cod op y el resto son el valor 
 } Operando;
+
+typedef struct {
+  uint8_t opc;
+  Operando op1;
+  Opernado op2;
+} Instruccion;
 
 typedef struct {
   uint16_t base; //dirreccion base (2 bytes) // uint16_t 16 bits sin signo
@@ -108,6 +113,51 @@ void MOV(uint8_t TOp2, uint8_t TOp1, uint32_t Op2, uint32_t Op1)
       break;
   }
 }
+
+int getOp2(... leido) {
+  return (leido>>6) & 0x03;
+}
+
+int getOp1(... leido) {
+  return (leido>>4) & 0x03;
+}
+
+int getOpc(... leido) {
+  return (leido & 0x0F);
+}
+
+void cargaMemoria() {
+  /*
+  lar = segmento offest??
+  mar = cantidad direccion fisica
+  mbr = valor a cargar
+  */
+
+  
+
+}
+
+void decodifica() {
+  Instruccion inst;
+  int tipoOp1,tipoOp2,opc;
+
+  if ( (leido>>4) & 0x01 == 0) { //preguntar por el bit 4
+    tipoOp1 = getOp2(leido) // es de un solo opeando
+    opc = 10+ getOpc();
+  }
+  else {
+    tipoOp2 = getOp2(leido); //10110000 -> 00000010 y mascara con 00000011 -> me quedo con el valor del tipo d op 1
+    tipoOp1 = getOp1(leido);
+    opc = getOpc();
+  }
+
+  if (tipoOp1 == 3 || tipoOp2 == 3) {
+    cargaMemoria();
+  }
+  
+
+}
+
 
 int getvalue(op) {
   int value = op & MASK_OP;
