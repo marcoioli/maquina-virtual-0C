@@ -20,7 +20,7 @@ uint8_t memory[MEMORY_SIZE]; // Memoria principal
     OP_ADD   = 0x11,    
     OP_SUB   = 0x12,    
     OP_MUL   = 0x13,    
-    OP_DIV   = 0x14,    
+    OP_DIV   = 0x14,      
     OP_CMP   = 0x15,    
     OP_SHL   = 0x16,    
     OP_SHR   = 0x17,    
@@ -60,22 +60,16 @@ typedef enum {
 uint32_t reg[REG_COUNT]; // Almacenamiento de registros
 
 typedef enum {
-  OP_NONE = 0x00;
-  OP_REGISTRO = 0x01;
-  OP_INMEDIATO = 0x02;
-  OP_MEMORIA = 0x03;
+  OP_NONE = 0x00,
+  OP_REGISTRO = 0x01,
+  OP_INMEDIATO = 0x02,
+  OP_MEMORIA = 0x03,
 } TipoOperando;
 
 typedef struct  {
   TipoOperando tipoOp;
   uint32_t valor; //2 bytes son cod op y el resto son el valor 
 } Operando;
-
-typedef struct {
-  uint8_t opc;
-  Operando op1;
-  Opernado op2;
-} Instruccion;
 
 typedef struct {
   uint16_t base; //dirreccion base (2 bytes) // uint16_t 16 bits sin signo
@@ -137,9 +131,13 @@ void cargaMemoria() {
 
 }
 
-void decodifica() {
+void getInstruction() {
   Instruccion inst;
   int tipoOp1,tipoOp2,opc;
+
+  int ip = reg[REG_IP];
+  int leido = memory[ip];
+
 
   if ( (leido>>4) & 0x01 == 0) { //preguntar por el bit 4
     tipoOp1 = getOp2(leido) // es de un solo operando
@@ -150,6 +148,15 @@ void decodifica() {
     tipoOp1 = getOp1(leido);
     opc = getOpc();
   }
+
+  inst.opc = opc;
+  inst.op1.tipoOp = tipoOp1;
+  inst.op2.tipoOp = tipoOp2;
+
+  reg[REG_OPC]= inst.opc;
+  reg[REG_OP1]
+  reg[REG_OP2]
+   
 }
 
 
@@ -167,7 +174,7 @@ int main() {
   while (running) {
     //cargar regip
 
-    decodifica(leido); 
+    getInstruction(leido); 
     //actualiza ip
     //memoria
 
