@@ -86,7 +86,7 @@ typedef struct {
 #define MASK_CC_N 0x80000000
 #define MASK_CC_Z 0x40000000
 
-void MOV(uint8_t TOp2, uint8_t TOp1, uint32_t Op2, uint32_t Op1)
+void MOV(Instruccion inst) 
 {
   uint32_t valor;
 
@@ -133,7 +133,7 @@ void cargaMemoria() {
   mbr = valor a cargar
   */
 
-  
+
 
 }
 
@@ -142,20 +142,14 @@ void decodifica() {
   int tipoOp1,tipoOp2,opc;
 
   if ( (leido>>4) & 0x01 == 0) { //preguntar por el bit 4
-    tipoOp1 = getOp2(leido) // es de un solo opeando
-    opc = 10+ getOpc();
+    tipoOp1 = getOp2(leido) // es de un solo operando
+    opc = 10 + getOpc();
   }
   else {
     tipoOp2 = getOp2(leido); //10110000 -> 00000010 y mascara con 00000011 -> me quedo con el valor del tipo d op 1
     tipoOp1 = getOp1(leido);
     opc = getOpc();
   }
-
-  if (tipoOp1 == 3 || tipoOp2 == 3) {
-    cargaMemoria();
-  }
-  
-
 }
 
 
@@ -165,7 +159,22 @@ int getvalue(op) {
 }
 
 int main() {
-    printf("Prueba commit");
+  Instruccion inst;
+
+  reg[REG_IP] = 0000; //base code segment leida en el header
+  int running = 1;
+
+  while (running) {
+    //cargar regip
+
+    decodifica(leido); 
+    //actualiza ip
+    //memoria
+
+    instruccion[instr.opc];
+
+
+  }
     return 0;
 }
 
