@@ -69,7 +69,7 @@ typedef enum {
 
 struct operando {
   TipoOperando tipoOp;
-  uint24_t valor; //2 bytes son cod op y el resto son el valor 
+  uint32_t valor; //2 bytes son cod op y el resto son el valor 
 }
 
 typedef struct {
@@ -81,8 +81,36 @@ typedef struct {
 #define MASK_CC_N 0x80000000
 #define MASK_CC_Z 0x40000000
 
+void MOV(uint8_t TOp2, uint8_t TOp1, uint32_t Op2, uint32_t Op1)
+{
+  uint32_t valor;
+
+  // Obtener valor del operando 2
+  switch (TOp2) {
+    case OP_REGISTRO: 
+      valor = reg[Op2];
+      break;
+    case OP_INMEDIATO: 
+      valor = Op2;
+      break;
+    case OP_MEMORIA: 
+      // Cargar desde memoria
+      break;
+  }
+
+  // Almacenar valor en el operando 1
+  switch (TOp1) {
+    case OP_REGISTRO: 
+      reg[Op1] = valor;
+      break;
+    case OP_MEMORIA: 
+      // Almacenar en memoria
+      break;
+  }
+}
+
 int getvalue(op) {
-  int value = op & MASK;
+  int value = op & MASK_OP;
   return value;
 }
 
