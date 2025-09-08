@@ -72,6 +72,12 @@ typedef struct  {
 } Operando;
 
 typedef struct {
+  Operando op1;
+  Operando op2;
+  int size;
+} Instruccion;
+
+typedef struct {
   uint16_t base; //dirreccion base (2 bytes) // uint16_t 16 bits sin signo
   uint16_t tam; // tamanio d el segmento
 } DescribeSegmentos; 
@@ -164,11 +170,12 @@ int getvalue() {
 int main() {
   Instruccion inst;
 
+  //leer header
   reg[REG_IP] = base; //base code segment leida en el header
   int running = 1;
 
   while (running) {
-    //cargar regip
+    //cargar regip 
 
     getInstruction(leido); 
     //actualiza ip
