@@ -138,15 +138,11 @@ void getInstruction() {
   int ip = reg[REG_IP];
   int leido = memory[ip];
 
-
-  if ( (leido>>4) & 0x01 == 0) { //preguntar por el bit 4
-    tipoOp1 = getOp2(leido) // es de un solo operando
-    opc = 10 + getOpc();
-  }
-  else {
-    tipoOp2 = getOp2(leido); //10110000 -> 00000010 y mascara con 00000011 -> me quedo con el valor del tipo d op 1
-    tipoOp1 = getOp1(leido);
-    opc = getOpc();
+  switch(tipoOp2) {
+    //tipoop es la cantidad de bytes a leeer
+    case OP_REGISTRO: 
+          
+    break;
   }
 
   inst.opc = opc;
@@ -154,13 +150,13 @@ void getInstruction() {
   inst.op2.tipoOp = tipoOp2;
 
   reg[REG_OPC]= inst.opc;
-  reg[REG_OP1]
-  reg[REG_OP2]
+  reg[REG_OP1] = (inst.op1.tipoOp << 24 | (inst.op1.valor & MASK_OP)); //mover tipo a los 8 bits mas significativos y valor al resto, el OR concatena bit a bit
+  reg[REG_OP2] = (inst.op2.tipoOp << 24 | (inst.op2.valor & MASK_OP));
    
 }
 
 
-int getvalue(op) {
+int getvalue() {
   int value = op & MASK_OP;
   return value;
 }
@@ -168,7 +164,7 @@ int getvalue(op) {
 int main() {
   Instruccion inst;
 
-  reg[REG_IP] = 0000; //base code segment leida en el header
+  reg[REG_IP] = base; //base code segment leida en el header
   int running = 1;
 
   while (running) {
