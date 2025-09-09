@@ -78,9 +78,20 @@ void leoArch(char nombrearch[],TMV * VM) {
             }
         }
     
+       
+
         fclose(archb);
 
     }
+    
+}
+
+void leeIP(TVM * MV) {
+
+    Instruccion instru;
+    vFunciones funciones;
+
+    declaraFunciones(funciones);
     
 }
 

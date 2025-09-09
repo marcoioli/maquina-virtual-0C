@@ -9,7 +9,9 @@ int main() {
 
 
     leoArch(nombrearch,&VM);
-      
+    
+    leeIP(&VM);
+
     return 0;
 }
 

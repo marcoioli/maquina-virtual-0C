@@ -68,3 +68,5 @@ cada funcion esta declarada en vm.c
 
 //funciones del programa
 void declaraFunciones(vFunciones Funciones);
+void leoArch(TVM * VM, int tam);
+void leeIP(TVM * VM);
