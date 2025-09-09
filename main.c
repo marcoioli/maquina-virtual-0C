@@ -4,7 +4,7 @@
 
 
 int main() {
-    TMV MV;
+    TMV VM;
   
     return 0;
 }

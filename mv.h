@@ -5,6 +5,7 @@
 #define MASK_OP 0x00FFFFFF
 #define MASK_CC_N 0x80000000
 #define MASK_CC_Z 0x40000000
+#define TAMID 5
 
 //  REGISTROS 
 #define LAR 0 //
@@ -30,17 +31,17 @@
 
 int reg[CANTREG]; // Almacenamiento de registros
 
-typedef struct theader{
-    char c[6]; //caracter por caracter o string?
+typedef struct THeader{
+    char id[TAMID]; //caracter por caracter o string?
     char version;
     unsigned short int tam;
-}theader;
+}THeader;
 
-typedef struct TMV {
+typedef struct TVM {
     int reg[CANTREG];
     int segmentos[SEG_TABLE]; //DescribeSegmentos segmentos[seg_table]; ????????????????
     int memory[MEMORY_SIZE];
-}
+} TVM
 
 typedef struct {
   uint16_t base; //dirreccion base (2 bytes) // uint16_t 16 bits sin signo
