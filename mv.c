@@ -34,7 +34,7 @@ void declaraFunciones (vFunciones funciones) {
 }
 
 void iniciaRegs(TVM * VM,int tam) {
-    VM->reg[CS] = 0; 
+    VM->reg[CS] = 0x00000000; 
     VM->reg[DS] = tam; //tamanio?? 
     VM->reg[IP] = VM->reg[CS];
 }
@@ -50,6 +50,7 @@ void leoArch(char nombrearch[],TMV * VM) {
     FILE * archb;
     THeader header;
     char t1,t2;
+    int i=0;
     
     if(archb = fopen(nombrearch,"rb")==NULL)
         printf("No se pudo abrir el archivo .asm");
@@ -69,10 +70,15 @@ void leoArch(char nombrearch[],TMV * VM) {
                 cargaSegmentos(VM,header.tam);
                 iniciaRegs();
                 //carga memoria
+
+                while(fread(&(MV->MEM[i]),1,1,arch)==1) {
+                     //lee de a 1 byte y carga la memoria con todo el codigo del .asm
+                    i++;
+                }
             }
         }
     
-
+        fclose(archb);
 
     }
     
