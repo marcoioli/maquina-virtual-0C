@@ -94,6 +94,26 @@ int getTam(int valor) {
   return (valor & 0x0000FFFF);
 }
 
+int direccionamiento_logtofis(TVM VM, int puntero){
+    int DirBase, Offset, DirFisica, TamSeg, LimiteSup;
+    
+    DirBase = getBase(VM.segmentos[(puntero & 0xFFFF0000) >> 16]);
+    Offset = puntero & 0x0000FFFF;
+
+    DirFisica = DirBase + Offset;
+    TamSeg = getTam(VM.segmentos[(puntero & 0xFFFF0000) >> 16]);
+
+    // 5. Límite superior (última celda válida)
+    LimiteSup = DirBase + TamSeg;
+
+    if (!( (DirBase <= DirFisica) && (DirFisica + 4 <= LimiteSup) )) {
+        generaerror(2);   // fallo de segmento
+        return -1;        // nunca llega si generaerror aborta
+    } else {
+        return DirFisica; // dirección física válida
+    }
+}
+
 void leeIP(TVM * MV) {
 
     Instruccion instru;
