@@ -40,7 +40,8 @@ typedef struct THeader{
 typedef struct TVM {
     int reg[CANTREG];
     int segmentos[SEG_TABLE]; //DescribeSegmentos segmentos[seg_table]; ????????????????
-    int memory[MEMORY_SIZE];
+    /*tipo*/ memory[MEMORY_SIZE];
+    //errores 
 } TVM
 
 typedef struct {

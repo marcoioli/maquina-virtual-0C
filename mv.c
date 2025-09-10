@@ -40,10 +40,11 @@ void iniciaRegs(TVM * VM,int tam) {
 }
 
 void cargaSegmentos(TVM * VM,int tam) {
-    VM->segmentos[]
+    VM->segmentos[CS] = tam;
     /*aca me conviene un vector con cs y ds, cargando parte alta y parte baja
     o un vector de registros (base y tamanio) y en cada uno guardo el valor
     */
+    VM->segmentos[DS] = (tam << 16) | (MEMORY_SIZE - tam); //los primeros 2 bytes son la base y los otros dos el tam
 }
 
 void leoArch(char nombrearch[],TMV * VM) {
@@ -58,6 +59,8 @@ void leoArch(char nombrearch[],TMV * VM) {
         fread(&header.id,sizeof(char*TAMID),1,archb);
         fread(&header.version,siezof(2*char),1,archb);
         //como se lee el tamanio??
+
+        //VMX25 1 tamanio 
         
         fread(&t1,sizeof(char),1,archb); //2D necesito cargar 8 y 8
         //c celda es de 32 bits, almaceno 002D, 0000 0000 0010 
@@ -66,7 +69,7 @@ void leoArch(char nombrearch[],TMV * VM) {
         //pregutnar
 
         if (strcmp(header.id, "VMX25")) {
-            if (header.version == 1) {
+            if (header.version == "1") {
                 cargaSegmentos(VM,header.tam);
                 iniciaRegs();
                 //carga memoria
@@ -77,13 +80,18 @@ void leoArch(char nombrearch[],TMV * VM) {
                 }
             }
         }
-    
-       
-
         fclose(archb);
 
     }
     
+}
+
+int getBase(int valor) {
+  return (valor & 0xFFFF0000)>>16;
+}
+
+int getTam(int valor) {
+  return (valor & 0x0000FFFF);
 }
 
 void leeIP(TVM * MV) {
@@ -92,6 +100,10 @@ void leeIP(TVM * MV) {
     vFunciones funciones;
 
     declaraFunciones(funciones);
+
+    while (VM->reg[IP] < getTam(VM->reg[CS>>16])+getBase(VM->reg[CS>>16])) { //[>>16 porque vas a donde seta el segmento par aconseguir la base y el tamanio]
+
+    }
     
 }
 
