@@ -165,6 +165,14 @@ void leeIP(TVM * MV) {
     
 }
 
+void DefinoRegistro(int *CodReg, int Op){ 
+  *CodReg = Op & 0x1F;
+}// Devuelve codigo de registro
+
+void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg){
+  *AuxR = VM.reg[CodReg];
+}
+
 
 //flujo
 /* 
