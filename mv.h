@@ -57,7 +57,8 @@ typedef struct  Operando{
 typedef struct {
   Operando op1;
   Operando op2;
-  int size;
+  int sizeA;
+  int sizeB;
   unsigned char inst; //ver par que es bien esto
 } Instruccion;
 
@@ -69,5 +70,12 @@ cada funcion esta declarada en vm.c
 
 //funciones del programa
 void declaraFunciones(vFunciones Funciones);
+void iniciaRegs(TVM * VM,int tam);
+void cargaSegmentos(TVM * VM,int tam);
 void leoArch(TVM * VM, int tam);
+int getBase(int valor);
+int getTam(int valor);
+int direccionamiento_logtofis(TVM VM, int puntero);
+void ComponentesInstruccion(TVM VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp)
+void SeteoValorOp(TVM VM,int DirFisicaActual,Instruccion *instr);
 void leeIP(TVM * VM);

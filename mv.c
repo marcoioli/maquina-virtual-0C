@@ -47,7 +47,7 @@ void cargaSegmentos(TVM * VM,int tam) {
     VM->segmentos[DS] = (tam << 16) | (MEMORY_SIZE - tam); //los primeros 2 bytes son la base y los otros dos el tam
 }
 
-void leoArch(char nombrearch[],TMV * VM) {
+void leoArch(char nombrearch[],TVM * VM) {
     FILE * archb;
     THeader header;
     char t1,t2;
@@ -113,6 +113,44 @@ int direccionamiento_logtofis(TVM VM, int puntero){
         return DirFisica; // dirección física válida
     }
 }
+
+void ComponentesInstruccion(TVM VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp){
+   unsigned char Instruccion = VM.memory[DirFisica];
+
+  instr->sizeB= (Instruccion & 0x000000C0) >> 6;
+  instr->sizeA = (Instruccion & 0x00000030) >> 4;
+  *CodOp = Instruccion & 0x1F;
+  *CantOp=2;
+
+  //Si no pasa por ningun if significa que tiene dos operandos.
+
+  if (instr->sizeA == 0){ //No existe OpA
+      if (instr->sizeB == 0){ //No existe opB
+        *CantOp=0;
+      }
+      else{ //Existe solo un operando
+          *CantOp=1;
+      }
+  }
+}
+
+void SeteoValorOp(TVM VM,int DirFisicaActual,Instruccion *instr){
+    instr->op1 = 0;
+    instr->op2 = 0;
+
+    for (int i=0;i<instr->sizeB;i++){
+        instr->sizeB += VM.memory[++DirFisicaActual];
+        if ((instr->sizeB-i) > 1)
+            instr->op2 = instr->op2 << 8;
+    }
+
+    for (int i=0;i<instr->op1;i++){
+        instr->op1 += VM.memory[++DirFisicaActual];
+        if ((instr->sizeA-i) > 1)
+            instr->op1 = instr->op1 << 8;
+    }
+}
+
 
 void leeIP(TVM * MV) {
 
