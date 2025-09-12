@@ -140,35 +140,53 @@ void ComponentesInstruccion(TVM VM, int DirFisica, Instruccion *instr, int *Cant
   }
 }
 
-void SeteoValorOp(TVM VM, int DirFisicaActual, Instruccion *instr){
-    instr->op1 = 0;
-    instr->op2 = 0;
+void SeteoValorOp(TVM VM,int DirFisicaActual,Instruccion *instr){
+    instr->valorA = 0;
+    instr->valorB = 0;
 
-    // Leer operandos en orden: primero opB, desoues opA
-    for (int i = 0; i < instr->sizeB; i++) {
-        instr->op2 = (instr->op2 << 8) | VM.MEM[++DirFisicaActual];
+    for (int i=0;i<instr->sizeB;i++){
+        instr->valorB += VM.memory[++DirFisicaActual];
+        if ((instr->sizeB-i) > 1)
+            instr->valorB = instr->valorB << 8;
     }
 
-    for (int i = 0; i < instr->sizeA; i++) {
-        instr->op1 = (instr->op1 << 8) | VM.MEM[++DirFisicaActual];
+    for (int i=0;i<instr->op1;i++){
+        instr->valorA += VM.memory[++DirFisicaActual];
+        if ((instr->sizeA-i) > 1)
+            instr->valorA = instr->valorA << 8;
     }
-
-    // el or concatena
 }
 
+/*
+void SeteoValorOp(TVM *VM, int dirFisicaActual, Instruccion *instr) {
+    instr->valorA = 0;
+    instr->valorB = 0;
 
-void leeIP(TVM * MV) {
+    // --- Operando B ---
+    for (int i = 0; i < instr->sizeB; i++) {
+        instr->valorB = (instr->valorB << 8) | VM->memory[++dirFisicaActual];
+    }
+
+    // --- Operando A ---
+    for (int i = 0; i < instr->sizeA; i++) {
+        instr->valorA = (instr->valorA << 8) | VM->memory[++dirFisicaActual];
+    }
+}
+*/
+
+
+void leeIP(TVM * VM) {
     int cantOp,DirFisicaActual,indiceseg;
     unisgned char codOp;
     Instruccion instru;
     vFunciones Funciones;
 
     declaraFunciones(funciones);
-    indiceseg = (MV->reg[CS]>>16)
+    indiceseg = (VM->reg[CS]>>16)
+    //[>>16 porque vas a donde seta el segmento par aconseguir la base y el tamanio]
 
-
-    while (VM->reg[IP] < getTam(indiceseg)+getBase(indiceseg)) { //[>>16 porque vas a donde seta el segmento par aconseguir la base y el tamanio]
-      DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
+    while (VM->reg[IP] < getTam(indiceseg)+getBase(indiceseg)) { //
+      DirFisicaActual = direccionamiento_logtofis(*VM,VM->R[IP]);
 
       ComponentesInstruccion(*MV,DirFisicaActual,&instruc,&CantOp,&CodOp);
 
@@ -199,6 +217,85 @@ void DefinoRegistro(int *CodReg, int Op){
 void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg){
   *AuxR = VM.reg[CodReg];
 }
+
+/*
+MAR   
+0004 
+cantidad - fisica(base fiscia(DS) + offset(valor de op1))
+LAR
+logica(base del ds) - nuevo offsetr
+MBR
+valor a cargar(el del op2) 
+
+*/
+
+void escribeMemoria(TVM * MV,int dirLogica, itn valor, itn size) {
+int dirFis;
+
+     // 1. Cargar LAR
+    VM->reg[LAR] = dirLogica;
+
+    // 2. Traducir dirección lógica a física
+    int dirFis = direccionamiento_logtofis(*VM, dirLogica);
+
+    // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
+    VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
+
+    // 4. Cargar en MBR
+    VM->reg[MBR] = valor;
+
+    // 5. Escribir en memoria (big-endian: byte más significativo primero)
+    for (int i = 0; i < size; i++) {
+        VM->memory[dirFis + (size - 1 - i)] = (valor >> (8 * i)) & 0xFF;
+
+}
+
+uint32_t leerMemoria(TVM *VM, int dirLogica, int size) {
+    // 1. Cargar LAR (dirección lógica completa: segmento + offset)
+    VM->reg[LAR] = dirLogica;
+
+    // 2. Traducir dirección lógica a física
+    int dirFis = direccionamiento_logtofis(*VM, dirLogica);
+
+    // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
+    VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
+
+    // 4. Leer memoria → acumular en valor
+    int valor = 0;
+    for (int i = 0; i < size; i++) {
+        valor = (valor << 8) | (VM->memory[dirFis + i] & 0xFF);
+    }
+
+    // 5. Guardar en MBR
+    VM->reg[MBR] = valor;
+
+    return valor;
+}
+
+void MOV(TVM * VM,Insruccion instruc) {
+
+  int valor,codReg;
+  //MOV A,B;
+  switch(instruc.sizeB) { 
+    case 2: valor = intruc.valorB;
+            break;
+    case 1: DefinoRegistro(&codReg,intruc.valorB);
+            valor = VM->reg[codReg];
+            break;
+    case 3: valor = leeMemoria();
+            break;
+  }   
+
+  switch (instruc.sizeA) {
+     case 1: DefinoRegistro(&codReg,intruc.valorA);
+            VM->reg[codReg]=valor;
+            break;
+     case 3: escribeMemoria(VM,instruc.valorA,valor,4);
+ }
+
+
+}
+
 
 
 //flujo

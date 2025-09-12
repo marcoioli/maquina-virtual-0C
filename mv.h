@@ -49,14 +49,9 @@ typedef struct {
   uint16_t tam; // tamanio d el segmento
 } DescribeSegmentos; 
 
-typedef struct  Operando{
-  TipoOperando tam;
-  uint32_t valor; //2 bytes son cod op y el resto son el valor 
-} Operando;
-
 typedef struct {
-  Operando op1;
-  Operando op2;
+  int valorA;
+  int valorB;
   int sizeA;
   int sizeB;
   unsigned char inst; //ver par que es bien esto
