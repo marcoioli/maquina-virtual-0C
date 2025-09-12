@@ -74,7 +74,7 @@ void leoArch(char nombrearch[],TVM * VM) {
                 iniciaRegs();
                 //carga memoria
 
-                while(fread(&(MV->MEM[i]),1,1,arch)==1) {
+                while(fread(&(MV->memory[i]),1,1,arch)==1) {
                      //lee de a 1 byte y carga la memoria con todo el codigo del .asm
                     i++;
                 }
@@ -94,7 +94,7 @@ int getTam(int valor) {
   return (valor & 0x0000FFFF);
 }
 
-int direccionamiento_logtofis(TVM VM, int puntero){
+int direccionamiento_logtofis(TVM * VM, int puntero){ //usar un parametro size si no hay que leer 4
     int DirBase, Offset, DirFisica, TamSeg, LimiteSup;
     int indicesegmento;
 
@@ -117,7 +117,7 @@ int direccionamiento_logtofis(TVM VM, int puntero){
     }
 }
 
-void ComponentesInstruccion(TVM VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp){
+void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp){
    unsigned char Instruccion = VM.memory[DirFisica];
 
   instr->sizeB= (Instruccion & 0x000000C0) >> 6;
@@ -140,7 +140,7 @@ void ComponentesInstruccion(TVM VM, int DirFisica, Instruccion *instr, int *Cant
   }
 }
 
-void SeteoValorOp(TVM VM,int DirFisicaActual,Instruccion *instr){
+void SeteoValorOp(TVM * VM,int DirFisicaActual,Instruccion *instr){
     instr->valorA = 0;
     instr->valorB = 0;
 
@@ -177,7 +177,7 @@ void SeteoValorOp(TVM *VM, int dirFisicaActual, Instruccion *instr) {
 
 void leeIP(TVM * VM) {
     int cantOp,DirFisicaActual,indiceseg;
-    unisgned char codOp;
+    unsigned char codOp;
     Instruccion instru;
     vFunciones Funciones;
 
@@ -229,7 +229,7 @@ valor a cargar(el del op2)
 
 */
 
-void escribeMemoria(TVM * MV,int dirLogica, itn valor, itn size) {
+void escribeMemoria(TVM * MV,int dirLogica, int valor, int size) {
 int dirFis;
 
      // 1. Cargar LAR
@@ -272,14 +272,14 @@ uint32_t leerMemoria(TVM *VM, int dirLogica, int size) {
     return valor;
 }
 
-void MOV(TVM * VM,Insruccion instruc) {
+void MOV(TVM * VM,Instruccion instruc) {
 
   int valor,codReg;
   //MOV A,B;
   switch(instruc.sizeB) { 
     case 2: valor = intruc.valorB;
             break;
-    case 1: DefinoRegistro(&codReg,intruc.valorB);
+    case 1: DefinoRegistro(&codReg,instruc.valorB);
             valor = VM->reg[codReg];
             break;
     case 3: valor = leeMemoria();
@@ -287,7 +287,7 @@ void MOV(TVM * VM,Insruccion instruc) {
   }   
 
   switch (instruc.sizeA) {
-     case 1: DefinoRegistro(&codReg,intruc.valorA);
+     case 1: DefinoRegistro(&codReg,instruc.valorA);
             VM->reg[codReg]=valor;
             break;
      case 3: escribeMemoria(VM,instruc.valorA,valor,4);
