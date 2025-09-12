@@ -3,7 +3,7 @@
 #include "mv.h"
 
 
-void declaraFunciones (vFunciones funciones) {
+void declaraFunciones (vFunciones Funciones) {
     //declara las funciones, cuando haga funciones[0] se ejecuta el sys
   Funciones[0]=SYS;
   Funciones[1]=JMP;
@@ -96,17 +96,20 @@ int getTam(int valor) {
 
 int direccionamiento_logtofis(TVM VM, int puntero){
     int DirBase, Offset, DirFisica, TamSeg, LimiteSup;
-    
-    DirBase = getBase(VM.segmentos[(puntero & 0xFFFF0000) >> 16]);
+    int indicesegmento;
+
+    indicesegmento = (puntero & 0xFFFF0000) >>16;
+
+    DirBase = getBase(VM.segmentos[indicesegmento]);
     Offset = puntero & 0x0000FFFF;
 
     DirFisica = DirBase + Offset;
-    TamSeg = getTam(VM.segmentos[(puntero & 0xFFFF0000) >> 16]);
+    TamSeg = getTam(VM.segmentos[indicesegmento]);
 
     // 5. Límite superior (última celda válida)
     LimiteSup = DirBase + TamSeg;
 
-    if (!( (DirBase <= DirFisica) && (DirFisica + 4 <= LimiteSup) )) {
+    if (!( (DirBase <= DirFisica) && (DirFisica + 4 <= LimiteSup) )) { //dir fisica + 4 ????
         generaerror(2);   // fallo de segmento
         return -1;        // nunca llega si generaerror aborta
     } else {
@@ -129,37 +132,61 @@ void ComponentesInstruccion(TVM VM, int DirFisica, Instruccion *instr, int *Cant
         *CantOp=0;
       }
       else{ //Existe solo un operando
-          *CantOp=1;
+          //en este caso, uso siempre op1
+            instr->sizeA = instr->sizeB;
+            instr->sizeB = 0;
+          *CantOp=1;        
       }
   }
 }
 
-void SeteoValorOp(TVM VM,int DirFisicaActual,Instruccion *instr){
+void SeteoValorOp(TVM VM, int DirFisicaActual, Instruccion *instr){
     instr->op1 = 0;
     instr->op2 = 0;
 
-    for (int i=0;i<instr->sizeB;i++){
-        instr->sizeB += VM.memory[++DirFisicaActual];
-        if ((instr->sizeB-i) > 1)
-            instr->op2 = instr->op2 << 8;
+    // Leer operandos en orden: primero opB, desoues opA
+    for (int i = 0; i < instr->sizeB; i++) {
+        instr->op2 = (instr->op2 << 8) | VM.MEM[++DirFisicaActual];
     }
 
-    for (int i=0;i<instr->op1;i++){
-        instr->op1 += VM.memory[++DirFisicaActual];
-        if ((instr->sizeA-i) > 1)
-            instr->op1 = instr->op1 << 8;
+    for (int i = 0; i < instr->sizeA; i++) {
+        instr->op1 = (instr->op1 << 8) | VM.MEM[++DirFisicaActual];
     }
+
+    // el or concatena
 }
 
 
 void leeIP(TVM * MV) {
-
+    int cantOp,DirFisicaActual,indiceseg;
+    unisgned char codOp;
     Instruccion instru;
-    vFunciones funciones;
+    vFunciones Funciones;
 
     declaraFunciones(funciones);
+    indiceseg = (MV->reg[CS]>>16)
 
-    while (VM->reg[IP] < getTam(VM->reg[CS>>16])+getBase(VM->reg[CS>>16])) { //[>>16 porque vas a donde seta el segmento par aconseguir la base y el tamanio]
+
+    while (VM->reg[IP] < getTam(indiceseg)+getBase(indiceseg)) { //[>>16 porque vas a donde seta el segmento par aconseguir la base y el tamanio]
+      DirFisicaActual = direccionamiento_logtofis(*MV,MV->R[IP]);
+
+      ComponentesInstruccion(*MV,DirFisicaActual,&instruc,&CantOp,&CodOp);
+
+      if (cantOp > 0) {
+        SeteoValorOp(*MV,DirFisicaActual,&instruc);
+      }
+      else {
+          instruc.op1 = 0;
+          instruc.op2 = 0;
+      }
+
+      if (!((codOp<=8) || (codOp>=10 && codOp<=26))) {
+        //error
+      }
+      else {
+        MV->reg[IP] += instruc.sizeA + instruc.sizeB;
+        Funciones[codOp](MV,instruc);
+      }
 
     }
     
