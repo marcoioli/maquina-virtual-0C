@@ -564,6 +564,86 @@ void SAR(TVM *VM, Instruccion instruc) {
     }
 }
 
+void AND(TVM *VM, Instruccion instruc) {
+    int codReg, resultado, valorA, valorB;
+
+    // 1. Leer operandos
+    valorB = guardaB(VM, instruc);
+
+    // --- Obtener OpA ---
+    switch (instruc.sizeA) {
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+
+        case 3: // memoria
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+
+        default:
+            valorA = 0;
+            break;
+    }
+
+    // 2. Ejecutar AND
+    resultado = valorA & valorB;
+
+    // 3. Guardar resultado en OpA
+    switch (instruc.sizeA) {
+        case 1: // registro
+            VM->reg[codReg] = resultado;
+            break;
+
+        case 3: // memoria
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+
+    // 4. Actualizar CC
+    actualizaCC(VM, resultado);
+}
+
+
+void OR(TVM *VM, Instruccion instruc) {
+    int codReg, resultado, valorA, valorB;
+
+    // 1. Leer operandos
+    valorB = guardaB(VM, instruc);
+
+    // --- Obtener OpA ---
+    switch (instruc.sizeA) {
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+
+        case 3: // memoria
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+
+        default:
+            valorA = 0;
+            break;
+    }
+
+    // 2. Ejecutar OR
+    resultado = valorA | valorB;
+
+    // 3. Guardar resultado en OpA
+    switch (instruc.sizeA) {
+        case 1: // registro
+            VM->reg[codReg] = resultado;
+            break;
+
+        case 3: // memoria
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+
+    // 4. Actualizar CC
+    actualizaCC(VM, resultado);
+}
 
 
 

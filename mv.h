@@ -82,6 +82,8 @@ void MUL(TVM * VM, Instruccion instruc);
 void SUB(TVM * VM, Instruccion instruc);
 void CMP(TVM * VM, Instruccion instruc);
 void SHR(TVM * VM, Instruccion instruc);
+void AND(TVM *VM, Instruccion instruc);
+void OR(TVM *VM, Instruccion instruc);
 
 void actualizaCC(TVM *VM, int resultado);
 int guardaB(TVM *VM, Instruccion instruc);
