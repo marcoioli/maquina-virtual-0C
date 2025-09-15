@@ -306,13 +306,12 @@ int guardaB(TVM *VM, Instruccion instruc) {
 }
 
 
-
 void MOV(TVM * VM,Instruccion instruc) {
 
   int valor,codReg;
   //MOV A,B;
 
-  valor = guardaB(vm,instruc);
+  valor = guardaB(VM,instruc);
 
   switch (instruc.sizeA) {
      case 1: DefinoRegistro(&codReg,instruc.valorA);
@@ -435,7 +434,7 @@ void DIV(TVM *VM, Instruccion instruc) {
       cociente = valorA / valorB;
     else 
       //genera error 3
-    
+    }
     resto = valorA % valorB;
 
     actualizaCC(VM, cociente);
@@ -454,6 +453,119 @@ void DIV(TVM *VM, Instruccion instruc) {
     // Guardar resto en AC
     VM->reg[AC] = resto;
 }
+
+void CMP(TVM *VM, Instruccion instruc) {
+    int valorA = 0, valorB = 0, resultado = 0, codReg;
+
+    valorB = guardaB(VM, instruc);  
+    switch (instruc.sizeA) {
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+
+        case 3: // memoria
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    resultado = valorA - valorB;
+    actualizaCC(VM, resultado);
+
+    // no guarda resultado
+}
+
+void SHL(TVM *VM, Instruccion instruc) {
+    int valorA = 0, desplazamientos = 0, resultado = 0, codReg;
+
+    // 
+    desplazamientos = guardaB(VM, instruc);
+
+    switch (instruc.sizeA) {
+        case 1:
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+        case 3:
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    resultado = valorA << desplazamientos;
+
+    actualizaCC(VM, resultado);
+
+    switch (instruc.sizeA) {
+        case 1:
+            VM->reg[codReg] = resultado;
+            break;
+        case 3:
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+}
+
+void SHR(TVM *VM, Instruccion instruc) {
+    int valorA = 0, desplazamientos = 0, resultado = 0, codReg;
+
+    desplazamientos = guardaB(VM, instruc);
+
+    switch (instruc.sizeA) {
+        case 1:
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+        case 3:
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    resultado = (unsigned int)valorA >> desplazamientos; // corrimiento lógico
+
+    actualizaCC(VM, resultado);
+
+    switch (instruc.sizeA) {
+        case 1:
+            VM->reg[codReg] = resultado;
+            break;
+        case 3:
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+}
+
+void SAR(TVM *VM, Instruccion instruc) {
+    int valorA = 0, desplazamientos = 0, resultado = 0, codReg;
+
+    desplazamientos = guardaB(VM, instruc);
+
+    //valor a desplazar
+    switch (instruc.sizeA) {
+        case 1:
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+        case 3:
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    resultado = valorA >> desplazamientos; // corrimiento aritmético (mantiene signo en int)
+
+    actualizaCC(VM, resultado);
+
+    switch (instruc.sizeA) {
+        case 1:
+            VM->reg[codReg] = resultado;
+            break;
+        case 3:
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+}
+
+
+
 
 
 
