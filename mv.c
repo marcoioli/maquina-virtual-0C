@@ -645,7 +645,133 @@ void OR(TVM *VM, Instruccion instruc) {
     actualizaCC(VM, resultado);
 }
 
+void XOR(TVM *VM, Instruccion instruc) {
+    int codReg, resultado, valorA, valorB;
 
+    // 1. Leer operandos
+    valorB = guardaB(VM, instruc);
+
+    // --- Obtener OpA ---
+    switch (instruc.sizeA) {
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+
+        case 3: // memoria
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+
+        default:
+            valorA = 0;
+            break;
+    }
+
+    // 2. Ejecutar XOR
+    resultado = valorA ^ valorB;
+
+    // 3. Guardar resultado en OpA
+    switch (instruc.sizeA) {
+        case 1: // registro
+            VM->reg[codReg] = resultado;
+            break;
+
+        case 3: // memoria
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+
+    // 4. Actualizar CC
+    actualizaCC(VM, resultado);
+}
+
+void SWAP(TVM *VM, Instruccion instruc) {
+    int codRegA, codRegB;
+    int valorA = 0, valorB = 0, temp;
+
+    // --- Obtener OpA ---
+    switch (instruc.sizeA) {
+        case 1: // registro
+            DefinoRegistro(&codRegA, instruc.valorA);
+            valorA = VM->reg[codRegA];
+            break;
+        case 3: // memoria
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    // --- Obtener OpB con guardaB ---
+    valorB = guardaB(VM, instruc);
+
+    // --- Intercambiar ---
+    temp   = valorA;
+    valorA = valorB;
+    valorB = temp;
+
+    // --- Guardar OpA ---
+    switch (instruc.sizeA) {
+        case 1: VM->reg[codRegA] = valorA; break;
+        case 3: escribeMemoria(VM, instruc.valorA, valorA, 4); break;
+    }
+
+    // --- Guardar OpB ---
+    switch (instruc.sizeB) {
+        case 1: // registro
+            DefinoRegistro(&codRegB, instruc.valorB);
+            VM->reg[codRegB] = valorB;
+            break;
+
+        case 3: // memoria
+            escribeMemoria(VM, instruc.valorB, valorB, 4);
+            break;
+
+        //case 2:  inmediato
+            // no se puede swap con inmediato, hay que generar error, 
+            // pero como no se pide, nose si hacerlo.
+        //    return;
+    }
+
+    // --- Actualizar CC ---
+    actualizaCC(VM, valorA);
+}
+
+void LDL(TVM *VM, Instruccion instruc) {
+    int codReg, valorB, resultado;
+
+    // --- OpA (destino) debe ser registro?? o puede ser de memoria tambien?? ---
+    DefinoRegistro(&codReg, instruc.valorA);
+
+    // --- OpB ---
+    valorB = guardaB(VM, instruc);
+
+    // --- LDL: reemplaza los 16 bits bajos ---
+    resultado = (VM->reg[codReg] & 0xFFFF0000) | (valorB & 0xFFFF);
+
+    // --- Guardar ---
+    VM->reg[codReg] = resultado;
+
+    // --- Actualizar banderas ---
+    actualizaCC(VM, resultado);
+}
+
+void LDH(TVM *VM, Instruccion instruc) {
+    int codReg, valorB, resultado;
+
+    // --- OpA (destino) ---
+    DefinoRegistro(&codReg, instruc.valorA);
+
+    // --- OpB ---
+    valorB = guardaB(VM, instruc);
+
+    // --- LDH: reemplaza los 16 bits altos ---
+    resultado = (VM->reg[codReg] & 0x0000FFFF) | ((valorB & 0xFFFF) << 16);
+
+    // --- Guardar ---
+    VM->reg[codReg] = resultado;
+
+    // --- Actualizar banderas ---
+    actualizaCC(VM, resultado);
+}
 
 
 
