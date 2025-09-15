@@ -77,6 +77,15 @@ void SeteoValorOp(TVM VM,int DirFisicaActual,Instruccion *instr);
 void leeIP(TVM * VM);
 
 void MOV(TVM * VM, Instruccion instruc);
+void ADD(TVM * VM, Instruccion instruc);
+void MUL(TVM * VM, Instruccion instruc);
+void SUB(TVM * VM, Instruccion instruc);
+void CMP(TVM * VM, Instruccion instruc);
+void SHR(TVM * VM, Instruccion instruc);
+
+void actualizaCC(TVM *VM, int resultado);
+int guardaB(TVM *VM, Instruccion instruc);
+
 int leerMemoria(TVM *VM, int dirLogica, int size) ;
 void escribeMemoria(TVM * MV,int dirLogica, int valor, int size);
 void DefinoRegistro(int *CodReg, int Op);
