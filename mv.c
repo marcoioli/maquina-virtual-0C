@@ -71,8 +71,7 @@ void leoArch(TVM * VM) {
 
         printf("Header: id=%s, version=%d, tam=%d\n", header.id, header.version, header.tam);
 
-        if (strcmp(header.id,"VMX25-")==0) {
-            if (header.version == '1') {
+        //AGREGAR VALIDACIONES DE HEADER
                 cargaSegmentos(VM,header.tam);
                 printf("Segmentos: CS=%08X, DS=%08X\n", VM->segmentos[CS], VM->segmentos[DS]);
                 iniciaRegs(VM,header.tam);
@@ -83,8 +82,12 @@ void leoArch(TVM * VM) {
                      //lee de a 1 byte y carga la memoria con todo el codigo del .asm
                     i++;
                 }
-            }
-        }
+            printf("Contenido de memoria (primeros 64 bytes):\n");
+            for (int j = 0; j < 64 && j < i; j++) {
+             printf("%02X ", VM->memory[j]);
+             if ((j+1) % 16 == 0) printf("\n");
+}
+        printf("\n");
         fclose(archb);
 
     }
@@ -99,27 +102,55 @@ int getTam(int valor) {
   return (valor & 0x0000FFFF);
 }
 
-int direccionamiento_logtofis(TVM * VM, int puntero){ //usar un parametro size si no hay que leer 4
+/*int direccionamiento_logtofis(TVM VM, int puntero){ //usar un parametro size si no hay que leer 4
     int DirBase, Offset, DirFisica, TamSeg, LimiteSup;
     int indicesegmento;
+    int descriptor;
+    int indiceSegmento = (puntero & 0xFFFF0000) >>16;
 
-    indicesegmento = (puntero & 0xFFFF0000) >>16;
-
-    DirBase = getBase(VM->segmentos[indicesegmento]);
     Offset = puntero & 0x0000FFFF;
+    descriptor = VM.segmentos[indiceSegmento];
+    DirBase = getBase(descriptor);
+    TamSeg = getTam(descriptor);
+
 
     DirFisica = DirBase + Offset;
-    TamSeg = getTam(VM->segmentos[indicesegmento]);
 
     // 5. Límite superior (última celda válida)
     LimiteSup = DirBase + TamSeg;
 
-    if (!( (DirBase <= DirFisica) && (DirFisica + 4 <= LimiteSup) )) { //dir fisica + 4 ????
-       // generaerror(2);   // fallo de segmento
-        return -1;        // nunca llega si generaerror aborta
-    } else {
-        return DirFisica; // dirección física válida
+    printf("[DEBUG] log=%08X -> seg=%d base=%d tam=%d offset=%d -> fisica=%d\n",
+        puntero, indiceSegmento, DirBase, TamSeg, Offset, DirFisica);
+
+    if (Offset + 4 < TamSeg) {
+        return -1;
+        //error
     }
+    else {
+        return DirFisica;
+    }
+
+
+}
+*/
+
+int direccionamiento_logtofis(TVM VM, int puntero) {
+    int indiceSegmento = (puntero & 0xFFFF0000) >> 16;
+    int offset = puntero & 0x0000FFFF;
+    int descriptor = VM.segmentos[indiceSegmento];
+    int base = getBase(descriptor);
+    int tam = getTam(descriptor);
+
+    int dirFisica = base + offset;
+
+    printf("[DEBUG] log=%08X -> seg=%d base=%d tam=%d offset=%d -> fisica=%d\n",
+        puntero, indiceSegmento, base, tam, offset, dirFisica);
+
+    if (offset + 4 > tam) {
+        printf("[ERROR] Acceso fuera de segmento\n");
+        return -1;
+    }
+    return dirFisica;
 }
 
 void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp){
@@ -176,6 +207,7 @@ void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
     for (int i = 0; i < instr->sizeA; i++) {
         instr->valorA = (instr->valorA << 8) | VM->memory[++dirFisicaActual];
     }
+
 }
 
 void leeIP(TVM * VM) {
@@ -186,22 +218,30 @@ void leeIP(TVM * VM) {
 
     declaraFunciones(Funciones);
     indiceseg = (VM->reg[CS]>>16);
+    printf("Indice segmento %d \n",indiceseg);
     //[>>16 porque vas a donde seta el segmento par aconseguir la base y el tamanio]
 
-    while (VM->reg[IP] < getTam(indiceseg)+getBase(indiceseg)) { //
-      DirFisicaActual = direccionamiento_logtofis(VM,VM->reg[IP]);
+  
+    while (VM->reg[IP] <=  getTam(indiceseg)+getBase(indiceseg)) { //
+      DirFisicaActual = direccionamiento_logtofis(*VM,VM->reg[IP]);
 
-      ComponentesInstruccion(VM,DirFisicaActual,&instruc,&cantOp,&codOp);
+     // ComponentesInstruccion(VM,DirFisicaActual,&instruc,&cantOp,&codOp);
+
+      printf("[DEBUG] Registros antes: EAX=%08X EBX=%08X ECX=%08X EDX=%08X AC=%08X CC=%08X\n",
+        VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX], VM->reg[AC], VM->reg[CC]);
+
 
       if (cantOp > 0) {
         SeteoValorOp(VM,DirFisicaActual,&instruc);
+            printf("\n[DEBUG] IP=%08X DirFisica=%08X CodOp=%02X CantOp=%d sizeA=%d sizeB=%d valorA=%08X valorB=%08X\n",
+        VM->reg[IP], DirFisicaActual, codOp, cantOp, instruc.sizeA, instruc.sizeB, instruc.valorA, instruc.valorB);
       }
       else {
           instruc.valorA = 0;
           instruc.valorB = 0;
       }
 
-      if (!((codOp<=8) || (codOp>=10 && codOp<=26))) {
+      if (!((codOp<=0x08) || (codOp>=0x10 && codOp<=0x1F))) {
         //error
         printf("Error condicion, cambiar");
       }
@@ -209,6 +249,7 @@ void leeIP(TVM * VM) {
         VM->reg[IP] += instruc.sizeA + instruc.sizeB;
         Funciones[codOp](VM,instruc);
       }
+
 
     }
 
@@ -240,7 +281,7 @@ int dirFis;
     VM->reg[LAR] = dirLogica;
 
     // 2. Traducir dirección lógica a física
-    dirFis = direccionamiento_logtofis(VM, dirLogica);
+    dirFis = direccionamiento_logtofis(*VM, dirLogica);
 
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
@@ -260,7 +301,7 @@ int leerMemoria(TVM *VM, int dirLogica, int size){
     VM->reg[LAR] = dirLogica;
 
     // 2. Traducir dirección lógica a física
-    int dirFis = direccionamiento_logtofis(VM, dirLogica);
+    int dirFis = direccionamiento_logtofis(*VM, dirLogica);
 
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);

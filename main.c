@@ -7,6 +7,7 @@ int main() {
     TVM VM;
 
     leoArch(&VM);
+    printf("Comienza a leer IP \n");
     leeIP(&VM);
 
     printf("EAX = %d (0x%08X)\n", VM.reg[EAX], VM.reg[EAX]);

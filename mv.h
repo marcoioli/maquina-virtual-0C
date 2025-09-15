@@ -70,7 +70,7 @@ void cargaSegmentos(TVM * VM,int tam);
 void leoArch(TVM * VM);
 int getBase(int valor);
 int getTam(int valor);
-int direccionamiento_logtofis(TVM * VM, int puntero);
+int direccionamiento_logtofis(TVM VM, int puntero);
 void ComponentesInstruccion(TVM *VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp);
 void SeteoValorOp(TVM *VM,int DirFisicaActual,Instruccion *instr);
 void leeIP(TVM * VM);
