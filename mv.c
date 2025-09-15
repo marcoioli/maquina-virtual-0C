@@ -387,6 +387,78 @@ void SUB(TVM *VM, Instruccion instruc) {
     }
 }
 
+void MUL(TVM *VM, Instruccion instruc) {
+    int valorA = 0, valorB = 0, resultado = 0, codReg;
+
+    valorB = guardaB(VM, instruc);
+
+    switch (instruc.sizeA) {
+        case 1:
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+        case 3:
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    resultado = valorA * valorB;
+
+    actualizaCC(VM, resultado);
+
+    switch (instruc.sizeA) {
+        case 1:
+            DefinoRegistro(&codReg, instruc.valorA);
+            VM->reg[codReg] = resultado;
+            break;
+        case 3:
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+}
+
+void DIV(TVM *VM, Instruccion instruc) {
+    int valorA = 0, valorB = 0, cociente = 0, resto = 0, codReg;
+
+    valorB = guardaB(VM, instruc);
+
+    switch (instruc.sizeA) {
+        case 1:
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+        case 3:
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+    if (valorB!= 0) {
+      cociente = valorA / valorB;
+    else 
+      //genera error 3
+    
+    resto = valorA % valorB;
+
+    actualizaCC(VM, cociente);
+
+    // Guardar cociente en A
+    switch (instruc.sizeA) {
+        case 1:
+            DefinoRegistro(&codReg, instruc.valorA);
+            VM->reg[codReg] = cociente;
+            break;
+        case 3:
+            escribeMemoria(VM, instruc.valorA, cociente, 4);
+            break;
+    }
+
+    // Guardar resto en AC
+    VM->reg[AC] = resto;
+}
+
+
+
+
+
 
 
 
