@@ -53,7 +53,7 @@ void leoArch(TVM * VM) {
     char t1,t2;
     int i=0;
 
-    archb = fopen("sample.vmx", "rb");
+    archb = fopen("sample.vmx","rb");
     if(archb==NULL)
         printf("No se pudo abrir el archivo .asm");
     else {
@@ -69,10 +69,14 @@ void leoArch(TVM * VM) {
         header.tam = t1<<8 | t2; //002D
         //pregutnar
 
-        if (strcmp(header.id, "VMX25")) {
+        printf("Header: id=%s, version=%d, tam=%d\n", header.id, header.version, header.tam);
+
+        if (strcmp(header.id,"VMX25-")==0) {
             if (header.version == '1') {
                 cargaSegmentos(VM,header.tam);
+                printf("Segmentos: CS=%08X, DS=%08X\n", VM->segmentos[CS], VM->segmentos[DS]);
                 iniciaRegs(VM,header.tam);
+                printf("Registros iniciales: CS=%08X, DS=%08X, IP=%08X\n", VM->reg[CS], VM->reg[DS], VM->reg[IP]);
                 //carga memoria
 
                 while(fread(&(VM->memory[i]),1,1,archb)==1) {
