@@ -272,19 +272,47 @@ int leerMemoria(TVM *VM, int dirLogica, int size){
     return valor;
 }
 
+void actualizaCC(TVM *VM, int resultado) {
+    VM->reg[CC] = 0;
+    if (resultado == 0) VM->reg[CC] |= 0x40000000; /* Z */
+    if (resultado < 0)  VM->reg[CC] |= 0x80000000; /* N */
+}
+
+
+int guardaB(TVM *VM, Instruccion instruc) {
+    int valorB = 0, codReg;
+
+    switch (instruc.sizeB) {
+        case 2: // inmediato
+            valorB = instruc.valorB;
+            break;
+
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorB);
+            valorB = VM->reg[codReg];
+            break;
+
+        case 3: // memoria
+            valorB = leerMemoria(VM, instruc.valorB, 4);
+            break;
+
+        default:
+            // No debería pasar
+            valorB = 0;
+            break;
+    }
+
+    return valorB;
+}
+
+
+
 void MOV(TVM * VM,Instruccion instruc) {
 
   int valor,codReg;
   //MOV A,B;
-  switch(instruc.sizeB) {
-    case 2: valor = instruc.valorB;
-            break;
-    case 1: DefinoRegistro(&codReg,instruc.valorB);
-            valor = VM->reg[codReg];
-            break;
-    case 3: valor = leeMemoria();
-            break;
-  }
+
+  valor = guardaB(vm,instruc);
 
   switch (instruc.sizeA) {
      case 1: DefinoRegistro(&codReg,instruc.valorA);
@@ -294,3 +322,72 @@ void MOV(TVM * VM,Instruccion instruc) {
             break;
  }
 }
+
+void ADD(TVM *VM, Instruccion instruc) {
+    int valorA = 0, valorB = 0, codReg;
+    int resultado = 0;
+
+    valorB = guardaB(VM,instruc);
+    switch (instruc.sizeA) {
+        case 1:
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+        case 3: 
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+    resultado = valorA + valorB;
+
+    //guardar en A
+    switch (instruc.sizeA) {
+        case 1: //reg
+            DefinoRegistro(&codReg, instruc.valorA);
+            VM->reg[codReg] = resultado;
+            break;
+        case 3: //memoria
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+    actualizaCC(VM, resultado);
+}
+
+void SUB(TVM *VM, Instruccion instruc) {
+    int valorA = 0, valorB = 0, resultado = 0, codReg;
+
+    //valor b
+    valorB = guardaB(VM, instruc);
+
+    //obtiene valor de a
+    switch (instruc.sizeA) {
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+
+        case 3: // memoria
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    resultado = valorA - valorB;
+
+    actualizaCC(VM, resultado);
+
+    //guarda
+    switch (instruc.sizeA) {
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            VM->reg[codReg] = resultado;
+            break;
+
+        case 3: // memoria
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+}
+
+
+
+
+
