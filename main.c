@@ -4,11 +4,9 @@
 
 
 int main() {
-    TMV VM;
-    char nombrearch[];
+    TVM VM;
 
-    leoArch(nombrearch,&VM);
-    
+    leoArch(&VM);
     leeIP(&VM);
 
     return 0;

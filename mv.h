@@ -68,22 +68,30 @@ cada funcion esta declarada en vm.c
 void declaraFunciones(vFunciones Funciones);
 void iniciaRegs(TVM * VM,int tam);
 void cargaSegmentos(TVM * VM,int tam);
-void leoArch(TVM * VM,char nombreacrh[]);
+void leoArch(TVM * VM);
 int getBase(int valor);
 int getTam(int valor);
 int direccionamiento_logtofis(TVM * VM, int puntero);
 void ComponentesInstruccion(TVM *VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp);
-void SeteoValorOp(TVM VM,int DirFisicaActual,Instruccion *instr);
+void SeteoValorOp(TVM *VM,int DirFisicaActual,Instruccion *instr);
 void leeIP(TVM * VM);
 
 void MOV(TVM * VM, Instruccion instruc);
+void DIV(TVM * VM, Instruccion instruc);
 void ADD(TVM * VM, Instruccion instruc);
 void MUL(TVM * VM, Instruccion instruc);
 void SUB(TVM * VM, Instruccion instruc);
 void CMP(TVM * VM, Instruccion instruc);
 void SHR(TVM * VM, Instruccion instruc);
+void SHL(TVM * VM, Instruccion instruc);
+void SAR(TVM * VM, Instruccion instruc);
 void AND(TVM *VM, Instruccion instruc);
 void OR(TVM *VM, Instruccion instruc);
+void XOR(TVM *VM, Instruccion instruc);
+void SWAP(TVM *VM, Instruccion instruc);
+void LDH(TVM *VM, Instruccion instruc);
+void LDL(TVM *VM, Instruccion instruc);
+
 
 void actualizaCC(TVM *VM, int resultado);
 int guardaB(TVM *VM, Instruccion instruc);

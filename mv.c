@@ -1,20 +1,12 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include "mv.h"
 
 
-void declaraFunciones(vFunciones Funciones[]){//declara las funciones, cuando haga funciones[0] se ejecuta el sys
-  Funciones[0]=SYS;
-  Funciones[1]=JMP;
-  Funciones[2]=JZ;
-  Funciones[3]=JP;
-  Funciones[4]=JN;
-  Funciones[5]=JNZ;
-  Funciones[6]=JNP;
-  Funciones[7]=JNN;
-  Funciones[8]=NOT;
-  Funciones[10]=MOV;
-  Funciones[11]=ADD;
+void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga funciones[0] se ejecuta el sys
+  Funciones[10]= MOV;
+  Funciones[11]= ADD;
   Funciones[12]=SUB;
   Funciones[13]=MUL;
   Funciones[14]=DIV;
@@ -24,12 +16,6 @@ void declaraFunciones(vFunciones Funciones[]){//declara las funciones, cuando ha
   Funciones[18]=SAR;
   Funciones[19]=AND;
   Funciones[20]=OR;
-  Funciones[21]=XOR;
-  Funciones[22]=SWAP;
-  Funciones[23]=LDL;
-  Funciones[24]=LDH;
-  Funciones[25]=RND;
-  Funciones[26]=STOP;
 }
 
 void iniciaRegs(TVM * VM,int tam) {
@@ -46,13 +32,14 @@ void cargaSegmentos(TVM * VM,int tam) {
     VM->segmentos[DS] = (tam << 16) | (MEMORY_SIZE - tam); //los primeros 2 bytes son la base y los otros dos el tam
 }
 
-void leoArch(TVM * VM,char nombreacrh[]) {
+void leoArch(TVM * VM) {
     FILE * archb;
     THeader header;
     char t1,t2;
     int i=0;
 
-    if(archb = fopen("prueba.vmx","rb")==NULL)
+    archb = fopen("prueba.vmx", "rb");
+    if(archb==NULL)
         printf("No se pudo abrir el archivo .asm");
     else {
         fread(&header.id,sizeof(char),5,archb);
@@ -68,7 +55,7 @@ void leoArch(TVM * VM,char nombreacrh[]) {
         //pregutnar
 
         if (strcmp(header.id, "VMX25")) {
-            if (header.version == "1") {
+            if (header.version == '1') {
                 cargaSegmentos(VM,header.tam);
                 iniciaRegs(VM,header.tam);
                 //carga memoria
@@ -109,7 +96,7 @@ int direccionamiento_logtofis(TVM * VM, int puntero){ //usar un parametro size s
     LimiteSup = DirBase + TamSeg;
 
     if (!( (DirBase <= DirFisica) && (DirFisica + 4 <= LimiteSup) )) { //dir fisica + 4 ????
-        generaerror(2);   // fallo de segmento
+       // generaerror(2);   // fallo de segmento
         return -1;        // nunca llega si generaerror aborta
     } else {
         return DirFisica; // dirección física válida
@@ -157,7 +144,7 @@ void SeteoValorOp(TVM * VM,int DirFisicaActual,Instruccion *instr){
 }
 */
 
-void SeteoValorOp(TVM *VM, int dirFisicaActual, Instruccion *instr) {
+void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
     instr->valorA = 0;
     instr->valorB = 0;
 
@@ -171,8 +158,6 @@ void SeteoValorOp(TVM *VM, int dirFisicaActual, Instruccion *instr) {
         instr->valorA = (instr->valorA << 8) | VM->memory[++dirFisicaActual];
     }
 }
-
-
 
 void leeIP(TVM * VM) {
     int cantOp,DirFisicaActual,indiceseg;
@@ -430,11 +415,11 @@ void DIV(TVM *VM, Instruccion instruc) {
             valorA = leerMemoria(VM, instruc.valorA, 4);
             break;
     }
-    if (valorB!= 0) {
+    if (valorB!= 0) 
       cociente = valorA / valorB;
     else 
       //genera error 3
-    }
+
     resto = valorA % valorB;
 
     actualizaCC(VM, cociente);
@@ -642,6 +627,134 @@ void OR(TVM *VM, Instruccion instruc) {
     }
 
     // 4. Actualizar CC
+    actualizaCC(VM, resultado);
+}
+
+void XOR(TVM *VM, Instruccion instruc) {
+    int codReg, resultado, valorA, valorB;
+
+    // 1. Leer operandos
+    valorB = guardaB(VM, instruc);
+
+    // --- Obtener OpA ---
+    switch (instruc.sizeA) {
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            valorA = VM->reg[codReg];
+            break;
+
+        case 3: // memoria
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+
+        default:
+            valorA = 0;
+            break;
+    }
+
+    // 2. Ejecutar XOR
+    resultado = valorA ^ valorB;
+
+    // 3. Guardar resultado en OpA
+    switch (instruc.sizeA) {
+        case 1: // registro
+            VM->reg[codReg] = resultado;
+            break;
+
+        case 3: // memoria
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+    }
+
+    // 4. Actualizar CC
+    actualizaCC(VM, resultado);
+}
+
+void SWAP(TVM *VM, Instruccion instruc) {
+    int codRegA, codRegB;
+    int valorA = 0, valorB = 0, temp;
+
+    // --- Obtener OpA ---
+    switch (instruc.sizeA) {
+        case 1: // registro
+            DefinoRegistro(&codRegA, instruc.valorA);
+            valorA = VM->reg[codRegA];
+            break;
+        case 3: // memoria
+            valorA = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    // --- Obtener OpB con guardaB ---
+    valorB = guardaB(VM, instruc);
+
+    // --- Intercambiar ---
+    temp   = valorA;
+    valorA = valorB;
+    valorB = temp;
+
+    // --- Guardar OpA ---
+    switch (instruc.sizeA) {
+        case 1: VM->reg[codRegA] = valorA; break;
+        case 3: escribeMemoria(VM, instruc.valorA, valorA, 4); break;
+    }
+
+    // --- Guardar OpB ---
+    switch (instruc.sizeB) {
+        case 1: // registro
+            DefinoRegistro(&codRegB, instruc.valorB);
+            VM->reg[codRegB] = valorB;
+            break;
+
+        case 3: // memoria
+            escribeMemoria(VM, instruc.valorB, valorB, 4);
+            break;
+
+        //case 2:  inmediato
+            // no se puede swap con inmediato, hay que generar error, 
+            // pero como no se pide, nose si hacerlo.
+        //    return;
+    }
+
+    // --- Actualizar CC ---
+    actualizaCC(VM, valorA);
+}
+
+void LDL(TVM *VM, Instruccion instruc) {
+    int codReg, valorB, resultado;
+
+    // --- OpA (destino) debe ser registro?? o puede ser de memoria tambien?? ---
+    DefinoRegistro(&codReg, instruc.valorA);
+
+    // --- OpB ---
+    valorB = guardaB(VM, instruc);
+
+    // --- LDL: reemplaza los 16 bits bajos ---
+    resultado = (VM->reg[codReg] & 0xFFFF0000) | (valorB & 0xFFFF);
+
+    // --- Guardar ---
+    VM->reg[codReg] = resultado;
+
+    // --- Actualizar banderas ---
+    actualizaCC(VM, resultado);
+}
+
+void LDH(TVM *VM, Instruccion instruc) {
+    int codReg, valorB, resultado;
+
+    // --- OpA (destino) ---
+    DefinoRegistro(&codReg, instruc.valorA);
+
+    // --- OpB ---
+    valorB = guardaB(VM, instruc);
+
+    // --- LDH: reemplaza los 16 bits altos ---
+    resultado = (VM->reg[codReg] & 0x0000FFFF) | ((valorB & 0xFFFF) << 16);
+
+    // --- Guardar ---
+    VM->reg[codReg] = resultado;
+
+    // --- Actualizar banderas ---
     actualizaCC(VM, resultado);
 }
 
