@@ -2,7 +2,7 @@
 #define MEMORY_SIZE 16384           // 16 KiB
 #define CANTREG 32
 #define SEG_TABLE 8
-#define CANTFUNC 26
+#define CANTFUNC 32
 #define MASK_OP 0x00FFFFFF
 #define MASK_CC_N 0x80000000
 #define MASK_CC_Z 0x40000000
@@ -30,7 +30,6 @@
 #define DS 27 //data segment
 //28 - 31 RESERVADOS
 
-int reg[CANTREG]; // Almacenamiento de registros
 
 typedef struct {
     char id[TAMID]; //caracter por caracter o string?

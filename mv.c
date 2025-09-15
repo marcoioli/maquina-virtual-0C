@@ -5,17 +5,32 @@
 
 
 void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga funciones[0] se ejecuta el sys
-  Funciones[10]= MOV;
-  Funciones[11]= ADD;
-  Funciones[12]=SUB;
-  Funciones[13]=MUL;
-  Funciones[14]=DIV;
-  Funciones[15]=CMP;
-  Funciones[16]=SHL;
-  Funciones[17]=SHR;
-  Funciones[18]=SAR;
-  Funciones[19]=AND;
-  Funciones[20]=OR;
+ // Instrucciones sin operandos
+    //Funciones[0x0F] = STOP;  // No implementada aún
+    
+    // Instrucciones con un operando  
+    //Funciones[0x00] = SYS;   // No implementada aún
+    //Funciones[0x01] = JMP;   // No implementada aún
+    //Funciones[0x02] = JZ;    // etc...
+    //Funciones[0x08] = NOT;   // No implementada aún
+    
+    // Instrucciones con dos operandos 
+    Funciones[0x10] = MOV;   // 16 decimal
+    Funciones[0x11] = ADD;   // 17 decimal  
+    Funciones[0x12] = SUB;   // 18 decimal
+    Funciones[0x13] = MUL;   // 19 decimal
+    Funciones[0x14] = DIV;   // 20 decimal
+    Funciones[0x15] = CMP;   // 21 decimal
+    Funciones[0x16] = SHL;   // 22 decimal
+    Funciones[0x17] = SHR;   // 23 decimal
+    Funciones[0x18] = SAR;   // 24 decimal
+    Funciones[0x19] = AND;   // 25 decimal
+    Funciones[0x1A] = OR;    // 26 decimal
+    Funciones[0x1B] = XOR;   // 27 decimal
+    Funciones[0x1C] = SWAP;  // 28 decimal
+    Funciones[0x1D] = LDL;   // 29 decimal
+    Funciones[0x1E] = LDH;   // 30 decimal
+    //Funciones[0x1F] = RND;   // No implementada aún
 }
 
 void iniciaRegs(TVM * VM,int tam) {
@@ -25,7 +40,7 @@ void iniciaRegs(TVM * VM,int tam) {
 }
 
 void cargaSegmentos(TVM * VM,int tam) {
-    VM->segmentos[CS] = tam;
+    VM->segmentos[CS] = (0 << 16) | tam; 
     /*aca me conviene un vector con cs yaads, cargando parte alta y parte baja
     o un vector de registros (base y tamanio) y en cada uno guardo el valor
     */
@@ -38,12 +53,12 @@ void leoArch(TVM * VM) {
     char t1,t2;
     int i=0;
 
-    archb = fopen("prueba.vmx", "rb");
+    archb = fopen("sample.vmx", "rb");
     if(archb==NULL)
         printf("No se pudo abrir el archivo .asm");
     else {
         fread(&header.id,sizeof(char),5,archb);
-        fread(&header.version,sizeof(char),2,archb);
+        fread(&header.version,sizeof(char),1,archb);
         //como se lee el tamanio??
 
         //VMX25 1 tamanio
@@ -184,6 +199,7 @@ void leeIP(TVM * VM) {
 
       if (!((codOp<=8) || (codOp>=10 && codOp<=26))) {
         //error
+        printf("Error condicion, cambiar");
       }
       else {
         VM->reg[IP] += instruc.sizeA + instruc.sizeB;
@@ -757,14 +773,3 @@ void LDH(TVM *VM, Instruccion instruc) {
     // --- Actualizar banderas ---
     actualizaCC(VM, resultado);
 }
-
-
-
-
-
-
-
-
-
-
-
