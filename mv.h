@@ -1,3 +1,4 @@
+
 #define MEMORY_SIZE 16384           // 16 KiB
 #define CANTREG 32
 #define SEG_TABLE 8
@@ -7,12 +8,12 @@
 #define MASK_CC_Z 0x40000000
 #define TAMID 5
 
-//  REGISTROS 
+//  REGISTROS
 #define LAR 0 //
 #define MAR 1 //
 #define MBR 2 //
 #define IP 3 //instruction pointer
-#define OPC 4 
+#define OPC 4
 #define OP1 5
 #define OP2 6
 //6 7 8 RESERVADOS
@@ -22,7 +23,7 @@
 #define EDX 13
 #define EEX 14
 #define EFX 15
-#define AC 16 //acumulador 
+#define AC 16 //acumulador
 #define CC 17 //condition code
 //18 - 28 RESERVADOS
 #define CS 26 //code segment
@@ -31,23 +32,23 @@
 
 int reg[CANTREG]; // Almacenamiento de registros
 
-typedef struct THeader{
+typedef struct {
     char id[TAMID]; //caracter por caracter o string?
     char version;
     unsigned short int tam;
 }THeader;
 
-typedef struct TVM {
+typedef struct  {
     int reg[CANTREG];
     int segmentos[SEG_TABLE]; //DescribeSegmentos segmentos[seg_table]; ????????????????
-    /*tipo*/ memory[MEMORY_SIZE];
-    //errores 
-} TVM
+    unsigned char memory[MEMORY_SIZE];
+    //errores
+} TVM;
 
 typedef struct {
-  uint16_t base; //dirreccion base (2 bytes) // uint16_t 16 bits sin signo
-  uint16_t tam; // tamanio d el segmento
-} DescribeSegmentos; 
+  int base; //dirreccion base (2 bytes) // uint16_t 16 bits sin signo
+  int tam; // tamanio d el segmento
+} DescribeSegmentos;
 
 typedef struct {
   int valorA;
@@ -57,7 +58,7 @@ typedef struct {
   unsigned char inst; //ver par que es bien esto
 } Instruccion;
 
-typedef void (*vFunciones[CANTFUNC])(TMV *mv,Instruccion inst); //Vector de punteros a funciones
+typedef void (*vFunciones[CANTFUNC])(TVM *VM,Instruccion inst); //Vector de punteros a funciones
 /*cada funcion tiene una posiicion relacionada con el codigo de operacion y se ejecuta la funcion en se indice
 cada funcion esta declarada en vm.c
 */
@@ -67,10 +68,18 @@ cada funcion esta declarada en vm.c
 void declaraFunciones(vFunciones Funciones);
 void iniciaRegs(TVM * VM,int tam);
 void cargaSegmentos(TVM * VM,int tam);
-void leoArch(TVM * VM, int tam);
+void leoArch(TVM * VM,char nombreacrh[]);
 int getBase(int valor);
 int getTam(int valor);
-int direccionamiento_logtofis(TVM VM, int puntero);
-void ComponentesInstruccion(TVM VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp)
+int direccionamiento_logtofis(TVM * VM, int puntero);
+void ComponentesInstruccion(TVM *VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp);
 void SeteoValorOp(TVM VM,int DirFisicaActual,Instruccion *instr);
 void leeIP(TVM * VM);
+
+void MOV(TVM * VM, Instruccion instruc);
+int leerMemoria(TVM *VM, int dirLogica, int size) ;
+void escribeMemoria(TVM * MV,int dirLogica, int valor, int size);
+void DefinoRegistro(int *CodReg, int Op);
+void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg);
+
+

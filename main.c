@@ -7,7 +7,6 @@ int main() {
     TMV VM;
     char nombrearch[];
 
-
     leoArch(nombrearch,&VM);
     
     leeIP(&VM);

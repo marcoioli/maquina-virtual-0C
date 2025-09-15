@@ -3,8 +3,7 @@
 #include "mv.h"
 
 
-void declaraFunciones (vFunciones Funciones) {
-    //declara las funciones, cuando haga funciones[0] se ejecuta el sys
+void declaraFunciones(vFunciones Funciones[]){//declara las funciones, cuando haga funciones[0] se ejecuta el sys
   Funciones[0]=SYS;
   Funciones[1]=JMP;
   Funciones[2]=JZ;
@@ -34,47 +33,47 @@ void declaraFunciones (vFunciones Funciones) {
 }
 
 void iniciaRegs(TVM * VM,int tam) {
-    VM->reg[CS] = 0x00000000; 
-    VM->reg[DS] = tam; //tamanio?? 
+    VM->reg[CS] = 0x00000000;
+    VM->reg[DS] = tam; //tamanio??
     VM->reg[IP] = VM->reg[CS];
 }
 
 void cargaSegmentos(TVM * VM,int tam) {
     VM->segmentos[CS] = tam;
-    /*aca me conviene un vector con cs y ds, cargando parte alta y parte baja
+    /*aca me conviene un vector con cs yaads, cargando parte alta y parte baja
     o un vector de registros (base y tamanio) y en cada uno guardo el valor
     */
     VM->segmentos[DS] = (tam << 16) | (MEMORY_SIZE - tam); //los primeros 2 bytes son la base y los otros dos el tam
 }
 
-void leoArch(char nombrearch[],TVM * VM) {
+void leoArch(TVM * VM,char nombreacrh[]) {
     FILE * archb;
     THeader header;
     char t1,t2;
     int i=0;
-    
-    if(archb = fopen(nombrearch,"rb")==NULL)
+
+    if(archb = fopen("prueba.vmx","rb")==NULL)
         printf("No se pudo abrir el archivo .asm");
     else {
-        fread(&header.id,sizeof(char*TAMID),1,archb);
-        fread(&header.version,siezof(2*char),1,archb);
+        fread(&header.id,sizeof(char),5,archb);
+        fread(&header.version,sizeof(char),2,archb);
         //como se lee el tamanio??
 
-        //VMX25 1 tamanio 
-        
+        //VMX25 1 tamanio
+
         fread(&t1,sizeof(char),1,archb); //2D necesito cargar 8 y 8
-        //c celda es de 32 bits, almaceno 002D, 0000 0000 0010 
+        //c celda es de 32 bits, almaceno 002D, 0000 0000 0010
         fread(&t2,sizeof(char),1,archb);
-        header.tam = t1(<<8) | t2; //002D
+        header.tam = t1<<8 | t2; //002D
         //pregutnar
 
         if (strcmp(header.id, "VMX25")) {
             if (header.version == "1") {
                 cargaSegmentos(VM,header.tam);
-                iniciaRegs();
+                iniciaRegs(VM,header.tam);
                 //carga memoria
 
-                while(fread(&(MV->memory[i]),1,1,arch)==1) {
+                while(fread(&(VM->memory[i]),1,1,archb)==1) {
                      //lee de a 1 byte y carga la memoria con todo el codigo del .asm
                     i++;
                 }
@@ -83,7 +82,7 @@ void leoArch(char nombrearch[],TVM * VM) {
         fclose(archb);
 
     }
-    
+
 }
 
 int getBase(int valor) {
@@ -100,11 +99,11 @@ int direccionamiento_logtofis(TVM * VM, int puntero){ //usar un parametro size s
 
     indicesegmento = (puntero & 0xFFFF0000) >>16;
 
-    DirBase = getBase(VM.segmentos[indicesegmento]);
+    DirBase = getBase(VM->segmentos[indicesegmento]);
     Offset = puntero & 0x0000FFFF;
 
     DirFisica = DirBase + Offset;
-    TamSeg = getTam(VM.segmentos[indicesegmento]);
+    TamSeg = getTam(VM->segmentos[indicesegmento]);
 
     // 5. Límite superior (última celda válida)
     LimiteSup = DirBase + TamSeg;
@@ -118,7 +117,7 @@ int direccionamiento_logtofis(TVM * VM, int puntero){ //usar un parametro size s
 }
 
 void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp){
-   unsigned char Instruccion = VM.memory[DirFisica];
+   unsigned char Instruccion = VM->memory[DirFisica];
 
   instr->sizeB= (Instruccion & 0x000000C0) >> 6;
   instr->sizeA = (Instruccion & 0x00000030) >> 4;
@@ -135,17 +134,17 @@ void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *Ca
           //en este caso, uso siempre op1
             instr->sizeA = instr->sizeB;
             instr->sizeB = 0;
-          *CantOp=1;        
+          *CantOp=1;
       }
   }
 }
-
+/*
 void SeteoValorOp(TVM * VM,int DirFisicaActual,Instruccion *instr){
     instr->valorA = 0;
     instr->valorB = 0;
 
     for (int i=0;i<instr->sizeB;i++){
-        instr->valorB += VM.memory[++DirFisicaActual];
+        instr->valorB += VM->memory[++DirFisicaActual];
         if ((instr->sizeB-i) > 1)
             instr->valorB = instr->valorB << 8;
     }
@@ -156,8 +155,8 @@ void SeteoValorOp(TVM * VM,int DirFisicaActual,Instruccion *instr){
             instr->valorA = instr->valorA << 8;
     }
 }
+*/
 
-/*
 void SeteoValorOp(TVM *VM, int dirFisicaActual, Instruccion *instr) {
     instr->valorA = 0;
     instr->valorB = 0;
@@ -172,45 +171,45 @@ void SeteoValorOp(TVM *VM, int dirFisicaActual, Instruccion *instr) {
         instr->valorA = (instr->valorA << 8) | VM->memory[++dirFisicaActual];
     }
 }
-*/
+
 
 
 void leeIP(TVM * VM) {
     int cantOp,DirFisicaActual,indiceseg;
     unsigned char codOp;
-    Instruccion instru;
+    Instruccion instruc;
     vFunciones Funciones;
 
-    declaraFunciones(funciones);
-    indiceseg = (VM->reg[CS]>>16)
+    declaraFunciones(Funciones);
+    indiceseg = (VM->reg[CS]>>16);
     //[>>16 porque vas a donde seta el segmento par aconseguir la base y el tamanio]
 
     while (VM->reg[IP] < getTam(indiceseg)+getBase(indiceseg)) { //
-      DirFisicaActual = direccionamiento_logtofis(*VM,VM->R[IP]);
+      DirFisicaActual = direccionamiento_logtofis(VM,VM->reg[IP]);
 
-      ComponentesInstruccion(*MV,DirFisicaActual,&instruc,&CantOp,&CodOp);
+      ComponentesInstruccion(VM,DirFisicaActual,&instruc,&cantOp,&codOp);
 
       if (cantOp > 0) {
-        SeteoValorOp(*MV,DirFisicaActual,&instruc);
+        SeteoValorOp(VM,DirFisicaActual,&instruc);
       }
       else {
-          instruc.op1 = 0;
-          instruc.op2 = 0;
+          instruc.valorA = 0;
+          instruc.valorB = 0;
       }
 
       if (!((codOp<=8) || (codOp>=10 && codOp<=26))) {
         //error
       }
       else {
-        MV->reg[IP] += instruc.sizeA + instruc.sizeB;
-        Funciones[codOp](MV,instruc);
+        VM->reg[IP] += instruc.sizeA + instruc.sizeB;
+        Funciones[codOp](VM,instruc);
       }
 
     }
-    
+
 }
 
-void DefinoRegistro(int *CodReg, int Op){ 
+void DefinoRegistro(int *CodReg, int Op){
   *CodReg = Op & 0x1F;
 }// Devuelve codigo de registro
 
@@ -219,24 +218,24 @@ void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg){
 }
 
 /*
-MAR   
-0004 
+MAR
+0004
 cantidad - fisica(base fiscia(DS) + offset(valor de op1))
 LAR
 logica(base del ds) - nuevo offsetr
 MBR
-valor a cargar(el del op2) 
+valor a cargar(el del op2)
 
 */
 
-void escribeMemoria(TVM * MV,int dirLogica, int valor, int size) {
+void escribeMemoria(TVM * VM,int dirLogica, int valor, int size) {
 int dirFis;
 
      // 1. Cargar LAR
     VM->reg[LAR] = dirLogica;
 
     // 2. Traducir dirección lógica a física
-    int dirFis = direccionamiento_logtofis(*VM, dirLogica);
+    dirFis = direccionamiento_logtofis(VM, dirLogica);
 
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
@@ -250,12 +249,13 @@ int dirFis;
 
 }
 
-uint32_t leerMemoria(TVM *VM, int dirLogica, int size) {
+}
+int leerMemoria(TVM *VM, int dirLogica, int size){
     // 1. Cargar LAR (dirección lógica completa: segmento + offset)
     VM->reg[LAR] = dirLogica;
 
     // 2. Traducir dirección lógica a física
-    int dirFis = direccionamiento_logtofis(*VM, dirLogica);
+    int dirFis = direccionamiento_logtofis(VM, dirLogica);
 
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
@@ -276,102 +276,21 @@ void MOV(TVM * VM,Instruccion instruc) {
 
   int valor,codReg;
   //MOV A,B;
-  switch(instruc.sizeB) { 
-    case 2: valor = intruc.valorB;
+  switch(instruc.sizeB) {
+    case 2: valor = instruc.valorB;
             break;
     case 1: DefinoRegistro(&codReg,instruc.valorB);
             valor = VM->reg[codReg];
             break;
     case 3: valor = leeMemoria();
             break;
-  }   
+  }
 
   switch (instruc.sizeA) {
      case 1: DefinoRegistro(&codReg,instruc.valorA);
             VM->reg[codReg]=valor;
             break;
      case 3: escribeMemoria(VM,instruc.valorA,valor,4);
+            break;
  }
-
-
 }
-
-
-
-//flujo
-/* 
-leer header, guardo base y tamanio de codigo y data segment
-cargo ds y cs
-cs = inicio(leido) offset
-ds = 1?????????
-
-inicializo ip, al principio ip=cs (punteros) 
-leo ip
-
-73 -> 0111 0011 
-Primero 2 bits -> getop1
-Segundos 2 bits -> getop2 
-5 bits menos significativos -> opc -> instrucciones[opc]
-(xxx1 0000) = 10
-(xxx0 0000) = 0
-
-avanzo ip -> ip+=1byte + bytesop1 + bytes op2
-
-si op1 o op2 es memoria
-cargo mar lar mbr
-
-hago la instruccion correspondiente
-
-void MOV(Instruccion inst) 
-{
-  
-}
-
-int getOp2(... leido) {
-  return (leido>>6) & 0x03;
-}
-
-int getOp1(... leido) {
-  return (leido>>4) & 0x03;
-}
-
-int getOpc(... leido) {
-  return (leido & 0x0F);
-}
-
-void cargaMemoria() {
-  /*
-  lar = segmento offest??
-  mar = cantidad direccion fisica
-  mbr = valor a cargar
-  
-
-
-
-}
-
-void getInstruction() {
-  Instruccion inst;
-  int tipoOp1,tipoOp2,opc;
-
-  int ip = reg[REG_IP];
-  int leido = memory[ip];
-
-  switch(tipoOp2) {
-    //tipoop es la cantidad de bytes a leeer
-    case OP_REGISTRO: 
-          
-    break;
-  }
-
-  inst.opc = opc;
-  inst.op1.tipoOp = tipoOp1;
-  inst.op2.tipoOp = tipoOp2;
-
-  reg[REG_OPC]= inst.opc;
-  reg[REG_OP1] = (inst.op1.tipoOp << 24 | (inst.op1.valor & MASK_OP)); //mover tipo a los 8 bits mas significativos y valor al resto, el OR concatena bit a bit
-  reg[REG_OP2] = (inst.op2.tipoOp << 24 | (inst.op2.valor & MASK_OP));
-   
-}
-
-*/
