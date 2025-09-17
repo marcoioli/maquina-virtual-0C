@@ -109,27 +109,25 @@ int getTam(int valor) {
   return (valor & 0x0000FFFF);
 }
 
-int direccionamiento_logtofis(TVM *VM, int dirLogica, int size) {
-    int segIndex, base, tam, offSet, dirFis, limiteSup;
+int getDirfisica(TVM *VM, int offset,int segmento, int size) {
 
-    segIndex = (dirLogica >>16) & 0xFFFF;
-    offSet = dirLogica & 0xFFFF;
-    
-    if (segIndex > 8) {
-        printf("Fallo de segmento SEGINDEX = %d",segIndex);
-    return -1;
-    }
+    int base,tam;
 
-    int entrada = VM->segmentos[segIndex];
-    int dirFisica = entrada & 0xFFFF;
-    tam = (entrada >> 16) & 0xFFFF;
-
-    if (offSet + size > tam) {
-        printf("ACCESO FUERA DE LIMITES %d %d %d",offSet, size, tam);
+    if (segmento > CANTSEGMENTOS) {
+        printf("[ERROR] ACCESO A SEGMENTO INVALIDO");
         return -1;
     }
-
-    return dirFisica + offSet;
+    else {
+        base = (VM->segmentos[segmento] & 0xFFFF0000) >> 16; //base del segmento 
+        tam = (VM->segmentos[segmento]&0x0000FFFF);
+        int dirFisica = base+offset;
+        if (dirFisica > base && dirFisica < tam ) //+ inicial
+            return dirFisica;
+        else {
+            printf("[ERROR] ACCEDIENDO A DIRECCION MENOR A LA BASE O MAYOR AL TAMANIO");
+            return -1;
+        }
+    }
 }
 
 void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp){
@@ -206,7 +204,8 @@ void leeIP(TVM *VM) {
     size = getTam(VM->segmentos[segIndex]);
 
     printf("[DEBUG] Inicio ejecución | segIndex=%d base=%d size=%d\n", segIndex, base, size);
-    printf("VALORES INICIALES CS=%08X DS=%08X IP=%08X",VM->reg[CS],VM->reg[DS],VM->reg[IP]);
+    printf("[SEGMENTOS] CODE SEGMENT %08X -- DATA SEGMENT %08X \n",VM->segmentos[SEG_CS],VM->segmentos[SEG_DS]);
+    printf("VALORES INICIALES CS=%08X DS=%08X IP=%08X \n",VM->reg[CS],VM->reg[DS],VM->reg[IP]);
 
     // Ciclo de ejecución
     while (ejecutando) {
@@ -218,11 +217,10 @@ void leeIP(TVM *VM) {
             ejecutando = 0; 
         } else {
             // Dirección física = base + offset
-            dirFisica = base + offset;
+            dirFisica = base + offset; //base del code segment y offset de ip
             unsigned char rawInstr = VM->memory[dirFisica];
             ComponentesInstruccion(VM, dirFisica, &instruc, &cantOp, &codOp);
 
-            
             printf("[FETCH] IP=%08X | DirFisica=%04X | rawInstr=%02X | codOp=%02X | sizeA=%d sizeB=%d cantOp=%d\n",
                    VM->reg[IP], dirFisica, rawInstr, codOp, instruc.sizeA, instruc.sizeB, cantOp);
 
@@ -268,6 +266,7 @@ void leeIP(TVM *VM) {
             printf("[DEBUG] Regs: EAX=%08X EBX=%08X ECX=%08X EDX=%08X AC=%08X CC=%08X IP=%08X\n",
                    VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX],
                    VM->reg[AC], VM->reg[CC], VM->reg[IP]);
+            printf("\n");
         }
     }
 }
@@ -298,7 +297,7 @@ int dirFis;
     printf("LAR : %08X \n",VM->reg[LAR]);
 
     // 2. Traducir dirección lógica a física
-     dirFis = direccionamiento_logtofis(VM, dirLogica, 4);
+     dirFis = getDirfisica(VM, dirLogica, 4);
 
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
@@ -324,7 +323,7 @@ int leerMemoria(TVM *VM, int dirLogica, int size){
     // 2. Traducir dirección lógica a física
     int CodReg = 
     int puntero = MV->reg[CodReg]+offset;
-    int dirFis = direccionamiento_logtofis(VM, , 4);
+    int dirFis = getDirfisica(VM, , 4);
 
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
@@ -344,22 +343,28 @@ int leerMemoria(TVM *VM, int dirLogica, int size){
 }
 */
 
-void escribeMemoria(TVM * VM, int dirLogica,int valor, int size) {
+void escribeMemoria(TVM * VM,int OP,int valor, int size) {
     
-    VM->reg[LAR] = dirLogica; //SEG DS EN LA SEGUNDA PARTE VA A SER != 1
+    int regact,csact,offreg,offop,offset;
     
-    printf("LAR : %08X \n",VM->reg[LAR]);
+    regact = (OP & 0x00FF0000) >> 16; //registro actual recibido a modificar
+    csact = (VM->reg[regact] & 0xFFFF0000) >> 16; //codigo de segmento de op recibido
+    offop = OP & 0x0000FFFF; //offset del op recibido
+    offreg = (VM->reg[regact] & 0x0000FFFF); //offset del registro 
+    offset = offreg + offop;
+    VM->reg[LAR] = csact << 16 | offset;
 
     // 2. Traducir dirección lógica a física
-    int dirFis = direccionamiento_logtofis(VM, dirLogica, 4);
+    int dirFis = getDirfisica(VM, offset,csact, 4); //dir fiscia va a ser base segmento + offset
 
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
 
-    printf("MAR %08X \n",VM->reg[MAR]);
-
     // 4. Cargar en MBR
     VM->reg[MBR] = valor;
+
+    printf("LAR : %08X \n",VM->reg[LAR]);
+    printf("MAR %08X \n",VM->reg[MAR]);
     printf("MBR %08X \n",VM->reg[MBR]);
 
     // 5. Escribir en memoria (big-endian: byte más significativo primero)
@@ -367,15 +372,19 @@ void escribeMemoria(TVM * VM, int dirLogica,int valor, int size) {
         VM->memory[dirFis + (size - 1 - i)] = (valor >> (8 * i)) & 0xFF;
 }
 
-int leerMemoria (TVM*VM, int dirLogica,int size) {
+int leerMemoria (TVM*VM, int OP,int size) {
     
-    int codReg = (dirLogica & 0x00FF0000)>>16;
-    int offSet = (dirLogica & 0x0000FFFF);
-    int puntero = VM->reg[codReg]+offSet;
+    int regact,csact,offreg,offop,offset;
 
-    int dirFis = direccionamiento_logtofis(VM,puntero,4);
+    regact = (OP & 0x00FF0000) >> 16; //registro actual recibido a modificar
+    csact = (VM->reg[regact] & 0xFFFF0000) >> 16; //codigo de segmento de op recibido
+    offop = OP & 0x0000FFFF; //offset del op recibido
+    offreg = (VM->reg[regact] & 0x0000FFFF); //offset del registro 
+    offset = offreg + offop;
+    VM->reg[LAR] = csact << 16 | offset;
 
-    VM->reg[LAR] = dirLogica;
+    int dirFis = getDirfisica(VM,offset,csact,4);
+
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
 
     int valorx = 0;
@@ -384,7 +393,9 @@ int leerMemoria (TVM*VM, int dirLogica,int size) {
     }
     VM->reg[MBR] = valorx;
 
-
+    printf("LAR  LECTURA: %08X \n",VM->reg[LAR]);
+    printf("MAR LECTURA %08X \n",VM->reg[MAR]);
+    printf("MBR LECTURA %08X \n",VM->reg[MBR]);
     return valorx;
 }
 
@@ -413,7 +424,7 @@ int guardaB(TVM *VM, Instruccion instruc) {
 
         case 3: // memoria
             printf("YENDO A LEER A MEMORIA \n");
-            valorB = leerMemoria(VM, instruc.valorB, 4);
+            valorB = leerMemoria(VM,VM->reg[OP2], 4);
             break;
 
         default:
@@ -439,9 +450,10 @@ void MOV(TVM * VM,Instruccion instruc) {
   switch (instruc.sizeA) {
      case 1: DefinoRegistro(&codReg,instruc.valorA);
             VM->reg[codReg]=valor;
-            printf("Valor : %08X CodReg : %d",valor,codReg);
+            printf("Valor : %08X CodReg : %d \n",valor,codReg);
             break;
-     case 3: escribeMemoria(VM,instruc.valorA,valor,4);
+     case 3: 
+            escribeMemoria(VM,VM->reg[OP1],valor,4); //valor es el valor de b a escribir en memoria
             break;
  }
 }
@@ -457,7 +469,7 @@ void ADD(TVM *VM, Instruccion instruc) {
             valorA = VM->reg[codReg];
             break;
         case 3: 
-            valorA = leerMemoria(VM,instruc.valorA, 4);
+            valorA = leerMemoria(VM,VM->reg[OP1], 4);
             break;
     }
     resultado = valorA + valorB;
@@ -469,7 +481,7 @@ void ADD(TVM *VM, Instruccion instruc) {
             VM->reg[codReg] = resultado;
             break;
         case 3: //memoria
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM, VM->reg[OP1], resultado, 4);
             break;
     }
     actualizaCC(VM, resultado);
@@ -489,7 +501,7 @@ void SUB(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
 
@@ -505,7 +517,7 @@ void SUB(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
     }
 }
@@ -525,7 +537,7 @@ void MUL(TVM *VM, Instruccion instruc) {
         case 3:
             printf("YENDO A LEER A MEMORIA LO QUE HAY EN OP A \n");
             printf("INSTRUC VALOR A :%08X \n",instruc.valorA);
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
 
@@ -539,7 +551,8 @@ void MUL(TVM *VM, Instruccion instruc) {
             VM->reg[codReg] = resultado;
             break;
         case 3:
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            printf("YENDO A ESCRIBIR EN MEMORIA \n");
+            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
     }
 }
@@ -555,7 +568,7 @@ void DIV(TVM *VM, Instruccion instruc) {
             valorA = VM->reg[codReg];
             break;
         case 3:
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
     if (valorB!= 0) 
@@ -574,7 +587,7 @@ void DIV(TVM *VM, Instruccion instruc) {
             VM->reg[codReg] = cociente;
             break;
         case 3:
-            escribeMemoria(VM, instruc.valorA, cociente, 4);
+            escribeMemoria(VM,VM->reg[OP1],cociente, 4);
             break;
     }
 
@@ -593,7 +606,7 @@ void CMP(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
 
@@ -615,7 +628,7 @@ void SHL(TVM *VM, Instruccion instruc) {
             valorA = VM->reg[codReg];
             break;
         case 3:
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
 
@@ -628,7 +641,7 @@ void SHL(TVM *VM, Instruccion instruc) {
             VM->reg[codReg] = resultado;
             break;
         case 3:
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
     }
 }
@@ -644,7 +657,7 @@ void SHR(TVM *VM, Instruccion instruc) {
             valorA = VM->reg[codReg];
             break;
         case 3:
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
 
@@ -657,7 +670,7 @@ void SHR(TVM *VM, Instruccion instruc) {
             VM->reg[codReg] = resultado;
             break;
         case 3:
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
     }
 }
@@ -674,7 +687,7 @@ void SAR(TVM *VM, Instruccion instruc) {
             valorA = VM->reg[codReg];
             break;
         case 3:
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
 
@@ -687,7 +700,7 @@ void SAR(TVM *VM, Instruccion instruc) {
             VM->reg[codReg] = resultado;
             break;
         case 3:
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
     }
 }
@@ -706,7 +719,7 @@ void AND(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
 
         default:
@@ -724,7 +737,7 @@ void AND(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
     }
 
@@ -747,7 +760,7 @@ void OR(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM,  VM->reg[OP1], 4);
             break;
 
         default:
@@ -765,7 +778,7 @@ void OR(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
     }
 
@@ -787,7 +800,7 @@ void XOR(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM,  VM->reg[OP1], 4);
             break;
 
         default:
@@ -805,7 +818,7 @@ void XOR(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
     }
 
@@ -824,7 +837,7 @@ void SWAP(TVM *VM, Instruccion instruc) {
             valorA = VM->reg[codRegA];
             break;
         case 3: // memoria
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
 
@@ -839,7 +852,7 @@ void SWAP(TVM *VM, Instruccion instruc) {
     // --- Guardar OpA ---
     switch (instruc.sizeA) {
         case 1: VM->reg[codRegA] = valorA; break;
-        case 3: escribeMemoria(VM, instruc.valorA, valorA, 4); break;
+        case 3: escribeMemoria(VM,VM->reg[OP1], valorA, 4); break;
     }
 
     // --- Guardar OpB ---
@@ -850,7 +863,7 @@ void SWAP(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            escribeMemoria(VM, instruc.valorB, valorB, 4);
+            escribeMemoria(VM,VM->reg[OP2], valorB, 4);
             break;
 
         //case 2:  inmediato
@@ -919,7 +932,7 @@ void RND(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // Memoria
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM,VM->reg[OP1],resultado, 4);
             break;
 
         //case 2: // Inmediato no permitido
@@ -943,7 +956,7 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // memoria
-            destino = leerMemoria(VM, instruc.valorA, 4);
+            destino = leerMemoria(VM,  VM->reg[OP1], 4);
             break;
     }
 
@@ -1020,9 +1033,9 @@ void NOT(TVM *VM, Instruccion instruc) {
             break;
 
         case 3: // Memoria
-            valor = leerMemoria(VM, instruc.valorA, 4);
+            valor = leerMemoria(VM,  VM->reg[OP1], 4);
             resultado = ~valor;
-            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
 
        // case 2: // Inmediato no permitido

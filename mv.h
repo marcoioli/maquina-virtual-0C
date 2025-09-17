@@ -7,6 +7,7 @@
 #define MASK_CC_N 0x80000000
 #define MASK_CC_Z 0x40000000
 #define TAMID 5
+#define CANTSEGMENTOS 8
 
 #define SEG_CS 0
 #define SEG_DS 1
@@ -73,7 +74,7 @@ void cargaSegmentos(TVM * VM,int tam);
 void leoArch(TVM * VM);
 int getBase(int valor);
 int getTam(int valor);
-//int direccionamiento_logtofis(TVM *VM, int dirLogica,int size);
+int getDirfisica(TVM *VM, int offset,int segmento, int size);
 void ComponentesInstruccion(TVM *VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp);
 void SeteoValorOp(TVM *VM,int DirFisicaActual,Instruccion *instr);
 void leeIP(TVM * VM);
@@ -107,7 +108,7 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc);
 void actualizaCC(TVM *VM, int resultado);
 int guardaB(TVM *VM, Instruccion instruc);
 
-int leerMemoria(TVM *VM, int dirLogica, int size) ;
+//int leerMemoria(TVM *VM, int dirLogica, int size) ;
 void escribeMemoria(TVM * MV,int dirLogica, int valor, int size);
 void DefinoRegistro(int *CodReg, int Op);
 void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg);
