@@ -152,26 +152,8 @@ void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *Ca
       }
   }
 }
-/*
-void SeteoValorOp(TVM * VM,int DirFisicaActual,Instruccion *instr){
-    instr->valorA = 0;
-    instr->valorB = 0;
 
-    for (int i=0;i<instr->sizeB;i++){
-        instr->valorB += VM->memory[++DirFisicaActual];
-        if ((instr->sizeB-i) > 1)
-            instr->valorB = instr->valorB << 8;
-    }
-
-    for (int i=0;i<instr->op1;i++){
-        instr->valorA += VM.memory[++DirFisicaActual];
-        if ((instr->sizeA-i) > 1)
-            instr->valorA = instr->valorA << 8;
-    }
-}
-*/
-
-void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
+/*void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
     instr->valorA = 0;
     instr->valorB = 0;
 
@@ -185,6 +167,38 @@ void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
         instr->valorA = (instr->valorA << 8) | VM->memory[++dirFisicaActual];
     }
 
+}
+    */
+
+    void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
+    instr->valorA = 0;
+    instr->valorB = 0;
+
+    // --- Operando B ---
+    for (int i = 0; i < instr->sizeB; i++) {
+        instr->valorB = (instr->valorB << 8) | VM->memory[++dirFisicaActual];
+    }
+    // Propagación de signo para inmediatos (sizeB == 2)
+    if (instr->sizeB == 2) {
+        int bytes = instr->sizeB;
+        int msb = 1 << ((bytes * 8) - 1);
+        if (instr->valorB & msb) {
+            instr->valorB |= ~((1 << (bytes * 8)) - 1); // Extiende el signo a 32 bits
+        }
+    }
+
+    // --- Operando A ---
+    for (int i = 0; i < instr->sizeA; i++) {
+        instr->valorA = (instr->valorA << 8) | VM->memory[++dirFisicaActual];
+    }
+    // Propagación de signo para inmediatos (sizeA == 2)
+    if (instr->sizeA == 2) {
+        int bytes = instr->sizeA;
+        int msb = 1 << ((bytes * 8) - 1);
+        if (instr->valorA & msb) {
+            instr->valorA |= ~((1 << (bytes * 8)) - 1); // Extiende el signo a 32 bits
+        }
+    }
 }
 
 void leeIP(TVM *VM) {
