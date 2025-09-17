@@ -107,8 +107,7 @@ int random32();
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc);
 void actualizaCC(TVM *VM, int resultado);
 int guardaB(TVM *VM, Instruccion instruc);
-
-leerMemoria(TVM *VM, int dirLogica, int size) ;
+int leerMemoria(TVM *VM, int dirLogica, int size) ;
 void escribeMemoria(TVM * MV,int dirLogica, int valor, int size);
 void DefinoRegistro(int *CodReg, int Op);
 void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg);

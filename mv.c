@@ -11,7 +11,7 @@ void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga
     //Funciones[0x0F] = STOP;  // No implementada aún
     
     // Instrucciones con un operando  
-    //Funciones[0x00] = SYS;   // No implementada aún
+   // Funciones[0x00] = SYS;   
     Funciones[0x01] = JMP;  
     Funciones[0x02] = JZ;    
     Funciones[0x03] = JP;
@@ -60,7 +60,7 @@ void leoArch(TVM * VM) {
     char t1,t2;
     int i=0;
 
-    archb = fopen("sample.vmx","rb");
+    archb = fopen("prueba.vmx","rb");
     if(archb==NULL)
         printf("No se pudo abrir el archivo .asm");
     else {
@@ -217,7 +217,7 @@ void leeIP(TVM *VM) {
     base = getBase(VM->segmentos[segIndex]);
     size = getTam(VM->segmentos[segIndex]);
 
-    printf("[DEBUG] Inicio ejecución | segIndex=%d base=%d size=%d\n", segIndex, base, size);
+    printf("[DEBUG] Inicio ejecución | segIndex=%d base=%d size=%d\n ac=%d", segIndex, base, size,VM->reg[AC]);
     printf("[SEGMENTOS] CODE SEGMENT %08X -- DATA SEGMENT %08X \n",VM->segmentos[SEG_CS],VM->segmentos[SEG_DS]);
     printf("VALORES INICIALES CS=%08X DS=%08X IP=%08X \n",VM->reg[CS],VM->reg[DS],VM->reg[IP]);
 
@@ -235,8 +235,8 @@ void leeIP(TVM *VM) {
             unsigned char rawInstr = VM->memory[dirFisica];
             ComponentesInstruccion(VM, dirFisica, &instruc, &cantOp, &codOp);
 
-            printf("[FETCH] IP=%08X | DirFisica=%04X | rawInstr=%02X | codOp=%02X | sizeA=%d sizeB=%d cantOp=%d\n",
-                   VM->reg[IP], dirFisica, rawInstr, codOp, instruc.sizeA, instruc.sizeB, cantOp);
+            printf("[FETCH] IP=%08X | DirFisica=%04X | rawInstr=%02X | codOp=%02X | sizeA=%d sizeB=%d cantOp=%d AC=%d\n",
+                   VM->reg[IP], dirFisica, rawInstr, codOp, instruc.sizeA, instruc.sizeB, cantOp,VM->reg[AC]);
 
             // lee operandos
             if (cantOp > 0) {
@@ -298,63 +298,6 @@ LAR
 logica(base del ds) - nuevo offsetr
 MBR
 valor a cargar(el del op2)
-
-*/
-
-/*void escribeMemoria(TVM * VM,int dirLogica, int valor, int size) {
-int dirFis;
-
-     // 1. Cargar LAR
-    
-    VM->reg[LAR] = dirLogica; //SEG DS EN LA SEGUNDA PARTE VA A SER != 1
-    
-    printf("LAR : %08X \n",VM->reg[LAR]);
-
-    // 2. Traducir dirección lógica a física
-     dirFis = getDirfisica(VM, dirLogica, 4);
-
-    // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
-    VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
-
-    printf("MAR %08X \n",VM->reg[MAR]);
-
-    // 4. Cargar en MBR
-    VM->reg[MBR] = valor;
-    printf("MBR %08X \n",VM->reg[MBR]);
-
-    // 5. Escribir en memoria (big-endian: byte más significativo primero)
-    for (int i = 0; i < size; i++) {
-        VM->memory[dirFis + (size - 1 - i)] = (valor >> (8 * i)) & 0xFF;
-
-}
-
-}
-int leerMemoria(TVM *VM, int dirLogica, int size){
-    // 1. Cargar LAR (dirección lógica completa: segmento + offset)
-    VM->reg[LAR] = (SEG_DS << 16) | (size) ;
-    printf("LAR LECTURA: %08X \n",VM->reg[LAR]);
-
-    // 2. Traducir dirección lógica a física
-    int CodReg = 
-    int puntero = MV->reg[CodReg]+offset;
-    int dirFis = getDirfisica(VM, , 4);
-
-    // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
-    VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
-    printf("MAR LECTURA %08X \n",VM->reg[MAR]);
-
-    // 4. Leer memoria → acumular en valor
-    int valor = 0;
-    for (int i = 0; i < size; i++) {
-        valor = (valor << 8) | (VM->memory[dirFis + i] & 0xFF);
-    }
-
-    // 5. Guardar en MBR
-    VM->reg[MBR] = valor;
-    printf("MBR LECTURA %08X \n",VM->reg[MBR]);
-
-    return valor; //VALOR A LEER EN EL LA POS DE MEMORIA INDICADA
-}
 */
 
 void escribeMemoria(TVM * VM,int OP,int valor, int size) {
@@ -499,6 +442,7 @@ void ADD(TVM *VM, Instruccion instruc) {
             break;
     }
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 void SUB(TVM *VM, Instruccion instruc) {
@@ -522,6 +466,7 @@ void SUB(TVM *VM, Instruccion instruc) {
     resultado = valorA - valorB;
 
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 
     //guarda
     switch (instruc.sizeA) {
@@ -558,6 +503,7 @@ void MUL(TVM *VM, Instruccion instruc) {
     resultado = valorA * valorB;
 
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 
     switch (instruc.sizeA) {
         case 1:
@@ -585,14 +531,14 @@ void DIV(TVM *VM, Instruccion instruc) {
             valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
-    if (valorB!= 0) 
+    if (valorB!= 0) {
       cociente = valorA / valorB;
-    else 
+      resto = valorA % valorB;
+        }
       //genera error 3
 
-    resto = valorA % valorB;
-
     actualizaCC(VM, cociente);
+    printf("VALOR DE CC = %08X \n",VM->reg[CC]);
 
     // Guardar cociente en A
     switch (instruc.sizeA) {
@@ -626,7 +572,8 @@ void CMP(TVM *VM, Instruccion instruc) {
 
     resultado = valorA - valorB;
     actualizaCC(VM, resultado);
-
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
+    
     // no guarda resultado
 }
 
@@ -649,6 +596,7 @@ void SHL(TVM *VM, Instruccion instruc) {
     resultado = valorA << desplazamientos;
 
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 
     switch (instruc.sizeA) {
         case 1:
@@ -678,6 +626,7 @@ void SHR(TVM *VM, Instruccion instruc) {
     resultado = (unsigned int)valorA >> desplazamientos; // corrimiento lógico
 
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 
     switch (instruc.sizeA) {
         case 1:
@@ -708,6 +657,7 @@ void SAR(TVM *VM, Instruccion instruc) {
     resultado = valorA >> desplazamientos; // corrimiento aritmético (mantiene signo en int)
 
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 
     switch (instruc.sizeA) {
         case 1:
@@ -757,6 +707,7 @@ void AND(TVM *VM, Instruccion instruc) {
 
     // 4. Actualizar CC
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 
@@ -798,6 +749,7 @@ void OR(TVM *VM, Instruccion instruc) {
 
     // 4. Actualizar CC
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 void XOR(TVM *VM, Instruccion instruc) {
@@ -838,6 +790,7 @@ void XOR(TVM *VM, Instruccion instruc) {
 
     // 4. Actualizar CC
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 void SWAP(TVM *VM, Instruccion instruc) {
@@ -888,6 +841,7 @@ void SWAP(TVM *VM, Instruccion instruc) {
 
     // --- Actualizar CC ---
     actualizaCC(VM, valorA);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 void LDL(TVM *VM, Instruccion instruc) {
@@ -907,6 +861,7 @@ void LDL(TVM *VM, Instruccion instruc) {
 
     // --- Actualizar banderas ---
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 void LDH(TVM *VM, Instruccion instruc) {
@@ -926,6 +881,7 @@ void LDH(TVM *VM, Instruccion instruc) {
 
     // --- Actualizar banderas ---
     actualizaCC(VM, resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 int random32() {
@@ -1059,4 +1015,5 @@ void NOT(TVM *VM, Instruccion instruc) {
 
     // Actualizar banderas
     actualizaCC(VM,resultado);
+    printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
