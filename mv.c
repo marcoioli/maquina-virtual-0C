@@ -1,7 +1,9 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <stdlib.h>
 #include "mv.h"
+
 
 
 void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga funciones[0] se ejecuta el sys
@@ -10,9 +12,14 @@ void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga
     
     // Instrucciones con un operando  
     //Funciones[0x00] = SYS;   // No implementada aún
-    //Funciones[0x01] = JMP;   // No implementada aún
-    //Funciones[0x02] = JZ;    // etc...
-    //Funciones[0x08] = NOT;   // No implementada aún
+    Funciones[0x01] = JMP;  
+    Funciones[0x02] = JZ;    
+    Funciones[0x03] = JP;
+    Funciones[0x04] = JN;
+    Funciones[0x05] = JNZ;
+    Funciones[0x06] = JNP;
+    Funciones[0x07] = JNN;
+    Funciones[0x08] = NOT;   
     
     // Instrucciones con dos operandos 
     Funciones[0x10] = MOV;   // 16 decimal
@@ -30,21 +37,21 @@ void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga
     Funciones[0x1C] = SWAP;  // 28 decimal
     Funciones[0x1D] = LDL;   // 29 decimal
     Funciones[0x1E] = LDH;   // 30 decimal
-    //Funciones[0x1F] = RND;   // No implementada aún
+    Funciones[0x1F] = RND;   
 }
 
 void iniciaRegs(TVM * VM,int tam) {
     VM->reg[CS] = 0x00000000;
-    VM->reg[DS] = tam; //tamanio??
+    VM->reg[DS] = (1<<16) | 0; //tamanio??
     VM->reg[IP] = VM->reg[CS];
 }
 
 void cargaSegmentos(TVM * VM,int tam) {
-    VM->segmentos[CS] = (0 << 16) | tam; 
+    VM->segmentos[SEG_CS] = (0 << 16) | tam; 
     /*aca me conviene un vector con cs yaads, cargando parte alta y parte baja
     o un vector de registros (base y tamanio) y en cada uno guardo el valor
     */
-    VM->segmentos[DS] = (tam << 16) | (MEMORY_SIZE - tam); //los primeros 2 bytes son la base y los otros dos el tam
+    VM->segmentos[SEG_DS] = (tam << 16) | (MEMORY_SIZE - tam); //los primeros 2 bytes son la base y los otros dos el tam
 }
 
 void leoArch(TVM * VM) {
@@ -102,55 +109,27 @@ int getTam(int valor) {
   return (valor & 0x0000FFFF);
 }
 
-/*int direccionamiento_logtofis(TVM VM, int puntero){ //usar un parametro size si no hay que leer 4
-    int DirBase, Offset, DirFisica, TamSeg, LimiteSup;
-    int indicesegmento;
-    int descriptor;
-    int indiceSegmento = (puntero & 0xFFFF0000) >>16;
+int direccionamiento_logtofis(TVM *VM, int dirLogica, int size) {
+    int segIndex, base, tam, offSet, dirFis, limiteSup;
 
-    Offset = puntero & 0x0000FFFF;
-    descriptor = VM.segmentos[indiceSegmento];
-    DirBase = getBase(descriptor);
-    TamSeg = getTam(descriptor);
-
-
-    DirFisica = DirBase + Offset;
-
-    // 5. Límite superior (última celda válida)
-    LimiteSup = DirBase + TamSeg;
-
-    printf("[DEBUG] log=%08X -> seg=%d base=%d tam=%d offset=%d -> fisica=%d\n",
-        puntero, indiceSegmento, DirBase, TamSeg, Offset, DirFisica);
-
-    if (Offset + 4 < TamSeg) {
-        return -1;
-        //error
-    }
-    else {
-        return DirFisica;
+    segIndex = (dirLogica >>16) & 0xFFFF;
+    offSet = dirLogica & 0xFFFF;
+    
+    if (segIndex > 8) {
+        printf("Fallo de segmento SEGINDEX = %d",segIndex);
+    return -1;
     }
 
+    int entrada = VM->segmentos[segIndex];
+    int dirFisica = entrada & 0xFFFF;
+    tam = (entrada >> 16) & 0xFFFF;
 
-}
-*/
-
-int direccionamiento_logtofis(TVM VM, int puntero) {
-    int indiceSegmento = (puntero & 0xFFFF0000) >> 16;
-    int offset = puntero & 0x0000FFFF;
-    int descriptor = VM.segmentos[indiceSegmento];
-    int base = getBase(descriptor);
-    int tam = getTam(descriptor);
-
-    int dirFisica = base + offset;
-
-    printf("[DEBUG] log=%08X -> seg=%d base=%d tam=%d offset=%d -> fisica=%d\n",
-        puntero, indiceSegmento, base, tam, offset, dirFisica);
-
-    if (offset + 4 > tam) {
-        printf("[ERROR] Acceso fuera de segmento\n");
+    if (offSet + size > tam) {
+        printf("ACCESO FUERA DE LIMITES %d %d %d",offSet, size, tam);
         return -1;
     }
-    return dirFisica;
+
+    return dirFisica + offSet;
 }
 
 void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp){
@@ -210,58 +189,93 @@ void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
 
 }
 
-void leeIP(TVM * VM) {
-    int cantOp,DirFisicaActual,indiceseg;
+void leeIP(TVM *VM) {
+    int segIndex, base, size;
+    int offset, dirFisica;
+    int cantOp;
     unsigned char codOp;
     Instruccion instruc;
     vFunciones Funciones;
+    int ejecutando = 1;  // bandera de control
 
     declaraFunciones(Funciones);
-    indiceseg = (VM->reg[CS]>>16);
-    printf("Indice segmento %d \n",indiceseg);
-    //[>>16 porque vas a donde seta el segmento par aconseguir la base y el tamanio]
 
-  
-    while (VM->reg[IP] <=  getTam(indiceseg)+getBase(indiceseg)) { //
-      DirFisicaActual = direccionamiento_logtofis(*VM,VM->reg[IP]);
+    // El segmento de código siempre está en el índice guardado en CS
+    segIndex = SEG_CS; //cambiar segun funcion log-to fis
+    base = getBase(VM->segmentos[segIndex]);
+    size = getTam(VM->segmentos[segIndex]);
 
-     // ComponentesInstruccion(VM,DirFisicaActual,&instruc,&cantOp,&codOp);
+    printf("[DEBUG] Inicio ejecución | segIndex=%d base=%d size=%d\n", segIndex, base, size);
+    printf("VALORES INICIALES CS=%08X DS=%08X IP=%08X",VM->reg[CS],VM->reg[DS],VM->reg[IP]);
 
-      printf("[DEBUG] Registros antes: EAX=%08X EBX=%08X ECX=%08X EDX=%08X AC=%08X CC=%08X\n",
-        VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX], VM->reg[AC], VM->reg[CC]);
+    // Ciclo de ejecución
+    while (ejecutando) {
+        offset = VM->reg[IP] & 0xFFFF;
+
+        // Validar que no nos pasamos del segmento de código
+        if (offset >= size) {
+            printf("[STOP] IP fuera de rango (offset=%d, size=%d)\n", offset, size);
+            ejecutando = 0; 
+        } else {
+            // Dirección física = base + offset
+            dirFisica = base + offset;
+            unsigned char rawInstr = VM->memory[dirFisica];
+            ComponentesInstruccion(VM, dirFisica, &instruc, &cantOp, &codOp);
+
+            
+            printf("[FETCH] IP=%08X | DirFisica=%04X | rawInstr=%02X | codOp=%02X | sizeA=%d sizeB=%d cantOp=%d\n",
+                   VM->reg[IP], dirFisica, rawInstr, codOp, instruc.sizeA, instruc.sizeB, cantOp);
+
+            // lee operandos
+            if (cantOp > 0) {
+                SeteoValorOp(VM, dirFisica, &instruc);
+            } else {
+                instruc.valorA = 0;
+                instruc.valorB = 0;
+            }
+
+            // Guardar en registros op
+            VM->reg[OPC] = codOp;
+            VM->reg[OP1] = (instruc.sizeA << 24) | (instruc.valorA & 0x00FFFFFF);
+            VM->reg[OP2] = (instruc.sizeB << 24) | (instruc.valorB & 0x00FFFFFF);
+
+            printf("OPC = %08X \n",VM->reg[OPC]);
+            printf("OP1 = %08X \n",VM->reg[OP1]);
+            printf("OP2 = %08X \n",VM->reg[OP2]);
 
 
-      if (cantOp > 0) {
-        SeteoValorOp(VM,DirFisicaActual,&instruc);
-            printf("\n[DEBUG] IP=%08X DirFisica=%08X CodOp=%02X CantOp=%d sizeA=%d sizeB=%d valorA=%08X valorB=%08X\n",
-        VM->reg[IP], DirFisicaActual, codOp, cantOp, instruc.sizeA, instruc.sizeB, instruc.valorA, instruc.valorB);
-      }
-      else {
-          instruc.valorA = 0;
-          instruc.valorB = 0;
-      }
+            // hace la funcion
+            if (!((codOp <= 0x08) || (codOp >= 0x10 && codOp <= 0x1F))) {
+                printf("[ERROR] Código de operación inválido: %02X\n", codOp);
+                ejecutando = 0;  // fin por error
+            } else if (Funciones[codOp] != NULL) {
+                printf("[EXECUTE] Ejecutando opcode %02X...\n", codOp);
+                Funciones[codOp](VM, instruc);
+            } else {
+                printf("[WARNING] Instrucción %02X no implementada\n", codOp);
+            }
 
-      if (!((codOp<=0x08) || (codOp>=0x10 && codOp<=0x1F))) {
-        //error
-        printf("Error condicion, cambiar");
-      }
-      else {
-        VM->reg[IP] += instruc.sizeA + instruc.sizeB;
-        Funciones[codOp](VM,instruc);
-      }
+            // actualiza ip
+            VM->reg[IP] += 1 + instruc.sizeA + instruc.sizeB;
 
+            // Condición de parada por STOP
+            if (VM->reg[IP] == -1) {
+                printf("[STOP] Ejecución finalizada por instrucción STOP\n");
+                ejecutando = 0;
+            }
 
+            // Debug de registros después de ejecutar
+            printf("[DEBUG] Regs: EAX=%08X EBX=%08X ECX=%08X EDX=%08X AC=%08X CC=%08X IP=%08X\n",
+                   VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX],
+                   VM->reg[AC], VM->reg[CC], VM->reg[IP]);
+        }
     }
-
 }
 
 void DefinoRegistro(int *CodReg, int Op){
   *CodReg = Op & 0x1F;
 }// Devuelve codigo de registro
 
-void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg){
-  *AuxR = VM.reg[CodReg];
-}
 
 /*
 MAR
@@ -274,20 +288,26 @@ valor a cargar(el del op2)
 
 */
 
-void escribeMemoria(TVM * VM,int dirLogica, int valor, int size) {
+/*void escribeMemoria(TVM * VM,int dirLogica, int valor, int size) {
 int dirFis;
 
      // 1. Cargar LAR
-    VM->reg[LAR] = dirLogica;
+    
+    VM->reg[LAR] = dirLogica; //SEG DS EN LA SEGUNDA PARTE VA A SER != 1
+    
+    printf("LAR : %08X \n",VM->reg[LAR]);
 
     // 2. Traducir dirección lógica a física
-    dirFis = direccionamiento_logtofis(*VM, dirLogica);
+     dirFis = direccionamiento_logtofis(VM, dirLogica, 4);
 
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
 
+    printf("MAR %08X \n",VM->reg[MAR]);
+
     // 4. Cargar en MBR
     VM->reg[MBR] = valor;
+    printf("MBR %08X \n",VM->reg[MBR]);
 
     // 5. Escribir en memoria (big-endian: byte más significativo primero)
     for (int i = 0; i < size; i++) {
@@ -298,13 +318,17 @@ int dirFis;
 }
 int leerMemoria(TVM *VM, int dirLogica, int size){
     // 1. Cargar LAR (dirección lógica completa: segmento + offset)
-    VM->reg[LAR] = dirLogica;
+    VM->reg[LAR] = (SEG_DS << 16) | (size) ;
+    printf("LAR LECTURA: %08X \n",VM->reg[LAR]);
 
     // 2. Traducir dirección lógica a física
-    int dirFis = direccionamiento_logtofis(*VM, dirLogica);
+    int CodReg = 
+    int puntero = MV->reg[CodReg]+offset;
+    int dirFis = direccionamiento_logtofis(VM, , 4);
 
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
+    printf("MAR LECTURA %08X \n",VM->reg[MAR]);
 
     // 4. Leer memoria → acumular en valor
     int valor = 0;
@@ -314,9 +338,56 @@ int leerMemoria(TVM *VM, int dirLogica, int size){
 
     // 5. Guardar en MBR
     VM->reg[MBR] = valor;
+    printf("MBR LECTURA %08X \n",VM->reg[MBR]);
 
-    return valor;
+    return valor; //VALOR A LEER EN EL LA POS DE MEMORIA INDICADA
 }
+*/
+
+void escribeMemoria(TVM * VM, int dirLogica,int valor, int size) {
+    
+    VM->reg[LAR] = dirLogica; //SEG DS EN LA SEGUNDA PARTE VA A SER != 1
+    
+    printf("LAR : %08X \n",VM->reg[LAR]);
+
+    // 2. Traducir dirección lógica a física
+    int dirFis = direccionamiento_logtofis(VM, dirLogica, 4);
+
+    // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
+    VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
+
+    printf("MAR %08X \n",VM->reg[MAR]);
+
+    // 4. Cargar en MBR
+    VM->reg[MBR] = valor;
+    printf("MBR %08X \n",VM->reg[MBR]);
+
+    // 5. Escribir en memoria (big-endian: byte más significativo primero)
+    for (int i = 0; i < size; i++) 
+        VM->memory[dirFis + (size - 1 - i)] = (valor >> (8 * i)) & 0xFF;
+}
+
+int leerMemoria (TVM*VM, int dirLogica,int size) {
+    
+    int codReg = (dirLogica & 0x00FF0000)>>16;
+    int offSet = (dirLogica & 0x0000FFFF);
+    int puntero = VM->reg[codReg]+offSet;
+
+    int dirFis = direccionamiento_logtofis(VM,puntero,4);
+
+    VM->reg[LAR] = dirLogica;
+    VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
+
+    int valorx = 0;
+    for (int i = 0; i < size; i++) {
+        valorx = (valorx << 8) | (VM->memory[dirFis + i] & 0xFF);
+    }
+    VM->reg[MBR] = valorx;
+
+
+    return valorx;
+}
+
 
 void actualizaCC(TVM *VM, int resultado) {
     VM->reg[CC] = 0;
@@ -328,17 +399,20 @@ void actualizaCC(TVM *VM, int resultado) {
 int guardaB(TVM *VM, Instruccion instruc) {
     int valorB = 0, codReg;
 
+    printf("INTRUC B : %d",instruc.sizeB);
+    printf("\n");
+
     switch (instruc.sizeB) {
         case 2: // inmediato
             valorB = instruc.valorB;
             break;
-
         case 1: // registro
             DefinoRegistro(&codReg, instruc.valorB);
             valorB = VM->reg[codReg];
             break;
 
         case 3: // memoria
+            printf("YENDO A LEER A MEMORIA \n");
             valorB = leerMemoria(VM, instruc.valorB, 4);
             break;
 
@@ -359,9 +433,13 @@ void MOV(TVM * VM,Instruccion instruc) {
 
   valor = guardaB(VM,instruc);
 
+  printf("EJECUTANDO MOV \n");
+  
+  
   switch (instruc.sizeA) {
      case 1: DefinoRegistro(&codReg,instruc.valorA);
             VM->reg[codReg]=valor;
+            printf("Valor : %08X CodReg : %d",valor,codReg);
             break;
      case 3: escribeMemoria(VM,instruc.valorA,valor,4);
             break;
@@ -379,7 +457,7 @@ void ADD(TVM *VM, Instruccion instruc) {
             valorA = VM->reg[codReg];
             break;
         case 3: 
-            valorA = leerMemoria(VM, instruc.valorA, 4);
+            valorA = leerMemoria(VM,instruc.valorA, 4);
             break;
     }
     resultado = valorA + valorB;
@@ -437,12 +515,16 @@ void MUL(TVM *VM, Instruccion instruc) {
 
     valorB = guardaB(VM, instruc);
 
+    printf("EJECUTANDO MUL \n");
+
     switch (instruc.sizeA) {
         case 1:
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
         case 3:
+            printf("YENDO A LEER A MEMORIA LO QUE HAY EN OP A \n");
+            printf("INSTRUC VALOR A :%08X \n",instruc.valorA);
             valorA = leerMemoria(VM, instruc.valorA, 4);
             break;
     }
@@ -817,4 +899,137 @@ void LDH(TVM *VM, Instruccion instruc) {
 
     // --- Actualizar banderas ---
     actualizaCC(VM, resultado);
+}
+
+int random32() {
+    return ((rand() & 0xFFFF) << 16) | (rand() & 0xFFFF);
+}
+
+void RND(TVM *VM, Instruccion instruc) {
+    int codReg, resultado;
+
+    // 1. Generar número aleatorio (32 bits)
+    resultado = random32();
+
+    // 2. Guardar en destino (OpA)
+    switch (instruc.sizeA) {
+        case 1: // Registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            VM->reg[codReg] = resultado;
+            break;
+
+        case 3: // Memoria
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+
+        //case 2: // Inmediato no permitido
+          //  generaerror(6); // Error: RND destino inmediato
+            //return;
+    }
+}
+
+int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
+    int codReg, destino;
+
+    //Resolver operando A
+    switch (instruc.sizeA) {
+        case 2: // inmediato
+            destino = instruc.valorA;
+            break;
+
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            destino = VM->reg[codReg];
+            break;
+
+        case 3: // memoria
+            destino = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    // Validar que no sale de CS
+    int segIndex = VM->reg[CS] >> 16;
+    int baseCS   = getBase(VM->segmentos[segIndex]);
+    int tamCS    = getTam(VM->segmentos[segIndex]);
+    int limiteCS = baseCS + tamCS;
+
+    //if (destino < baseCS || destino >= limiteCS) {
+      //  generaerror(8); // salto fuera del segmento CS
+        //return -1;
+    //}
+
+    return destino;
+}
+
+void JMP(TVM *VM, Instruccion instruc) {
+    int destino = resolverSaltoSeguro(VM, instruc);
+    if (destino != -1) VM->reg[IP] = destino;
+}
+
+void JZ(TVM *VM, Instruccion instruc) {
+    if (VM->reg[CC] & 0x40000000) { // Z=1 (bit 30)
+        int destino = resolverSaltoSeguro(VM, instruc);
+        if (destino != -1) VM->reg[IP] = destino;
+    }
+}
+
+void JNZ(TVM *VM, Instruccion instruc) {
+    if (!(VM->reg[CC] & 0x40000000)) {
+        int destino = resolverSaltoSeguro(VM, instruc);
+        if (destino != -1) VM->reg[IP] = destino;
+    }
+}
+
+void JN(TVM *VM, Instruccion instruc) {
+    if (VM->reg[CC] & 0x80000000) { // N=1 (bit 31)
+        int destino = resolverSaltoSeguro(VM, instruc);
+        if (destino != -1) VM->reg[IP] = destino;
+    }
+}
+
+void JNN(TVM *VM, Instruccion instruc) {
+    if (!(VM->reg[CC] & 0x80000000)) {
+        int destino = resolverSaltoSeguro(VM, instruc);
+        if (destino != -1) VM->reg[IP] = destino;
+    }
+}
+
+void JP(TVM *VM, Instruccion instruc) {
+    if (!(VM->reg[CC] & 0x80000000) && !(VM->reg[CC] & 0x40000000)) {
+        int destino = resolverSaltoSeguro(VM, instruc);
+        if (destino != -1) VM->reg[IP] = destino;
+    }
+}
+
+void JNP(TVM *VM, Instruccion instruc) {
+    if ((VM->reg[CC] & 0x80000000) || (VM->reg[CC] & 0x40000000)) {
+        int destino = resolverSaltoSeguro(VM, instruc);
+        if (destino != -1) VM->reg[IP] = destino;
+    }
+}
+
+void NOT(TVM *VM, Instruccion instruc) {
+    int codReg, valor, resultado;
+
+    switch (instruc.sizeA) {
+        case 1: // Registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            valor = VM->reg[codReg];
+            resultado = ~valor;
+            VM->reg[codReg] = resultado;
+            break;
+
+        case 3: // Memoria
+            valor = leerMemoria(VM, instruc.valorA, 4);
+            resultado = ~valor;
+            escribeMemoria(VM, instruc.valorA, resultado, 4);
+            break;
+
+       // case 2: // Inmediato no permitido
+         //   generaerror(9); // Error: NOT destino inmediato
+           // return;
+    }
+
+    // Actualizar banderas
+    actualizaCC(VM,resultado);
 }

@@ -8,6 +8,9 @@
 #define MASK_CC_Z 0x40000000
 #define TAMID 5
 
+#define SEG_CS 0
+#define SEG_DS 1
+
 //  REGISTROS
 #define LAR 0 //
 #define MAR 1 //
@@ -70,7 +73,7 @@ void cargaSegmentos(TVM * VM,int tam);
 void leoArch(TVM * VM);
 int getBase(int valor);
 int getTam(int valor);
-int direccionamiento_logtofis(TVM VM, int puntero);
+//int direccionamiento_logtofis(TVM *VM, int dirLogica,int size);
 void ComponentesInstruccion(TVM *VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp);
 void SeteoValorOp(TVM *VM,int DirFisicaActual,Instruccion *instr);
 void leeIP(TVM * VM);
@@ -90,8 +93,17 @@ void XOR(TVM *VM, Instruccion instruc);
 void SWAP(TVM *VM, Instruccion instruc);
 void LDH(TVM *VM, Instruccion instruc);
 void LDL(TVM *VM, Instruccion instruc);
-
-
+void RND(TVM *VM, Instruccion instruc);
+void JMP(TVM *VM, Instruccion instruc);
+void JZ(TVM *VM, Instruccion instruc);
+void JN(TVM *VM, Instruccion instruc);
+void JNZ(TVM *VM, Instruccion instruc);
+void JNN(TVM *VM, Instruccion instruc);
+void JP(TVM *VM, Instruccion instruc);
+void JNP(TVM *VM, Instruccion instruc);
+void NOT(TVM *VM, Instruccion instruc);
+int random32();
+int resolverSaltoSeguro(TVM *VM, Instruccion instruc);
 void actualizaCC(TVM *VM, int resultado);
 int guardaB(TVM *VM, Instruccion instruc);
 
