@@ -172,8 +172,7 @@ int getDirfisica(TVM *VM, int offset,int segmento, int size) {
     int base,tam;
 
     if (segmento > CANTSEGMENTOS) {
-        printf("[ERROR] ACCESO A SEGMENTO INVALIDO");
-        return -1;
+        generaerror(ERROR_SEGMENTO);
     }
     else {
         base = (VM->segmentos[segmento] & 0xFFFF0000) >> 16; //base del segmento 
@@ -444,8 +443,7 @@ int guardaB(TVM *VM, Instruccion instruc) {
             break;
 
         default:
-            // No debería pasar
-            valorB = 0;
+            generaerror(ERROR_OPERANDO);
             break;
     }
 
@@ -464,10 +462,14 @@ void MOV(TVM * VM,Instruccion instruc) {
   
   
   switch (instruc.sizeA) {
-     case 1: DefinoRegistro(&codReg,instruc.valorA);
+     case 1:
+            DefinoRegistro(&codReg,instruc.valorA);
             VM->reg[codReg]=valor;
             printf("Valor : %08X CodReg : %d \n",valor,codReg);
             break;
+     case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
      case 3: 
             escribeMemoria(VM,VM->reg[OP1],valor,4); //valor es el valor de b a escribir en memoria
             break;
@@ -484,6 +486,9 @@ void ADD(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3: 
             valorA = leerMemoria(VM,VM->reg[OP1], 4);
             break;
@@ -516,7 +521,9 @@ void SUB(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
-
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3: // memoria
             valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
@@ -552,6 +559,9 @@ void MUL(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3:
             printf("YENDO A LEER A MEMORIA LO QUE HAY EN OP A \n");
             printf("INSTRUC VALOR A :%08X \n",instruc.valorA);
@@ -586,6 +596,9 @@ void DIV(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3:
             valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
@@ -593,8 +606,9 @@ void DIV(TVM *VM, Instruccion instruc) {
     if (valorB!= 0) {
       cociente = valorA / valorB;
       resto = valorA % valorB;
-        }
-      //genera error 3
+    } 
+    else
+        generaerror(ERROR_DIVISION_POR_CERO);
 
     actualizaCC(VM, cociente);
     printf("VALOR DE CC = %08X \n",VM->reg[CC]);
@@ -647,6 +661,9 @@ void SHL(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3:
             valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
@@ -677,6 +694,9 @@ void SHR(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato 
         case 3:
             valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
@@ -708,6 +728,9 @@ void SAR(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3:
             valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
@@ -740,13 +763,11 @@ void AND(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
-
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3: // memoria
             valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
-
-        default:
-            valorA = 0;
             break;
     }
 
@@ -782,13 +803,11 @@ void OR(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
-
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3: // memoria
             valorA = leerMemoria(VM,  VM->reg[OP1], 4);
-            break;
-
-        default:
-            valorA = 0;
             break;
     }
 
@@ -823,13 +842,11 @@ void XOR(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codReg, instruc.valorA);
             valorA = VM->reg[codReg];
             break;
-
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3: // memoria
             valorA = leerMemoria(VM,  VM->reg[OP1], 4);
-            break;
-
-        default:
-            valorA = 0;
             break;
     }
 
@@ -862,6 +879,9 @@ void SWAP(TVM *VM, Instruccion instruc) {
             DefinoRegistro(&codRegA, instruc.valorA);
             valorA = VM->reg[codRegA];
             break;
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
         case 3: // memoria
             valorA = leerMemoria(VM, VM->reg[OP1], 4);
             break;
@@ -995,10 +1015,9 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
     int tamCS    = getTam(VM->segmentos[segIndex]);
     int limiteCS = baseCS + tamCS;
 
-    //if (destino < baseCS || destino >= limiteCS) {
-      //  generaerror(8); // salto fuera del segmento CS
-        //return -1;
-    //}
+    if (destino < baseCS || destino >= limiteCS) {
+        generaerror(ERROR_SEGMENTO);
+    }
 
     return destino;
 }
@@ -1066,10 +1085,9 @@ void NOT(TVM *VM, Instruccion instruc) {
             resultado = ~valor;
             escribeMemoria(VM,VM->reg[OP1], resultado, 4);
             break;
-
-       // case 2: // Inmediato no permitido
-         //   generaerror(9); // Error: NOT destino inmediato
-           // return;
+        case 2:
+            generaerror(ERROR_OPERANDO);
+            break; //no puede ser inmediato
     }
 
     // Actualizar banderas
@@ -1279,5 +1297,23 @@ void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegist
     }
 
     printf("\n");
+}
+
+void generaerror(int codigo) {
+    switch (codigo) {
+        case ERROR_INSTRUCCION:
+            printf("[ERROR] Instrucción inválida\n");
+            break;
+        case ERROR_DIVISION_POR_CERO:
+            printf("[ERROR] División por cero\n");
+            break;
+        case ERROR_SEGMENTO:
+            printf("[ERROR] Fuera de los limites del segmento\n");
+            break;
+        case ERROR_OPERANDO:
+            printf("[ERROR] Operando inválido\n");
+            break;
+    }
+    exit(EXIT_FAILURE); // Aborta la ejecución
 }
 
