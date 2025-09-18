@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include "mv.h"
 
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
@@ -1075,6 +1076,100 @@ void NOT(TVM *VM, Instruccion instruc) {
     printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
+void SYS(TVM *VM, Instruccion instruc){
+    int servicio, modo, posmemoria, ecx, size, count, logica,   segmento, offset,offset_inicial;
+
+    switch (instruc.sizeA) {
+        case 2: // inmediato
+            servicio = instruc.valorA;
+            break;
+        case 1: { // registro
+            int codReg;
+            DefinoRegistro(&codReg, instruc.valorA);
+            servicio = VM->reg[codReg];
+            break;
+        }
+        case 3: // memoria
+            servicio = leerMemoria(VM, instruc.valorA, 4);
+            break;
+    }
+
+    modo = VM->reg[EAX];   
+    ecx = VM->reg[ECX];
+    size = (ecx >> 16) & 0xFFFF; // bytes por celda
+     count = ecx & 0xFFFF;     
+    logica = VM->reg[EDX]; // dirección lógica del buffer
+    segmento = (logica >> 16) & 0xFFFF;
+    offset = (logica & 0x0000FFFF);
+
+   if (servicio == 1) {
+        for (int i = 0; i < count; i++) {
+            int offset = offset + i*size;
+            int dirFis = getDirfisica(VM, offset, segmento, size);
+            if (dirFis == -1) return; // error de acceso
+
+            printf("[%04X] ", dirFis & 0xFFFF);
+
+            int numero = 0;
+            if (modo == 0x10) {
+                numero = leer_binario_c2_32();
+            } else if (modo == 0x08) {
+                scanf("%X", &numero);
+            } else if (modo == 0x04) {
+                scanf("%o", &numero);
+            } else if (modo == 0x02) {
+                char c;
+                scanf(" %c", &c);
+                numero = (int)c;
+            } else {
+                scanf("%d", &numero); // decimal
+            }
+
+            // Guardar en memoria física
+            if (size == 1) {
+                VM->memory[dirFis] = numero & 0xFF;
+            } else if (size == 2) {
+                VM->memory[dirFis]     = (numero >> 8) & 0xFF;
+                VM->memory[dirFis + 1] = numero & 0xFF;
+            } else if (size == 4) {
+                for (int j = 3; j >= 0; j--) {
+                    VM->memory[dirFis + (3-j)] = (numero >> (8*j)) & 0xFF;
+                }
+            }
+        }
+    }
+
+    else if (servicio == 2) {
+        for (int i = 0; i < count; i++) {
+            int offset = offset_inicial + i*size;
+            int dirFis = getDirfisica(VM, offset, segmento, size);
+            if (dirFis == -1) return;
+
+            // Reconstruir valor desde memoria física
+            int valor = 0;
+            for (int j = 0; j < size; j++) {
+                valor = (valor << 8) | (VM->memory[dirFis + j] & 0xFF);
+            }
+
+            printf("[%04X] ", dirFis & 0xFFFF);
+
+            if (modo == 0x02) { // caracter
+                if (isprint(valor & 0xFF))
+                    printf("%c\n", valor & 0xFF);
+                else
+                    printf(".\n");
+            } else if (modo == 0x08) { // hex
+                printf("0x%X\n", valor);
+            } else if (modo == 0x04) { // octal
+                printf("0%o\n", valor);
+            } else if (modo == 0x10) { // binario
+                imprimir_binario_32(valor);
+            } else { // decimal
+                printf("%d\n", valor);
+            }
+        }
+    }
+}
 
 
 
@@ -1156,3 +1251,4 @@ void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegist
 
     printf("\n");
 }
+

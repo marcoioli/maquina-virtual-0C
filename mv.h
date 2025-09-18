@@ -105,6 +105,9 @@ void JNN(TVM *VM, Instruccion instruc);
 void JP(TVM *VM, Instruccion instruc);
 void JNP(TVM *VM, Instruccion instruc);
 void NOT(TVM *VM, Instruccion instruc);
+void SYS(TVM *VM, Instruccion instruc);
+
+void leer_binario_c2_32();
 int random32();
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc);
 void actualizaCC(TVM *VM, int resultado);
