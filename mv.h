@@ -66,12 +66,14 @@ typedef void (*vFunciones[CANTFUNC])(TVM *VM,Instruccion inst); //Vector de punt
 cada funcion esta declarada en vm.c
 */
 
+void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]);
+void inicializoVecRegistros(char VecRegistros[CANTREG][4]);
 
 //funciones del programa
 void declaraFunciones(vFunciones Funciones);
 void iniciaRegs(TVM * VM,int tam);
 void cargaSegmentos(TVM * VM,int tam);
-void leoArch(TVM * VM);
+void leoArch(TVM * VM, char nomarch[]);
 int getBase(int valor);
 int getTam(int valor);
 int getDirfisica(TVM *VM, int offset,int segmento, int size);
@@ -112,4 +114,5 @@ void escribeMemoria(TVM * MV,int dirLogica, int valor, int size);
 void DefinoRegistro(int *CodReg, int Op);
 void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg);
 
-
+void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);
+void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegistros[CANTREG][4], unsigned char CodOp, Instruccion instruc, int PosInicial, int PosFinal);

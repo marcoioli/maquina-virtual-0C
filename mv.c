@@ -4,6 +4,63 @@
 #include <stdlib.h>
 #include "mv.h"
 
+void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
+    //2 Operandos
+    strcpy(VecFunciones[0x10], "MOV");
+    strcpy(VecFunciones[0x11], "ADD");
+    strcpy(VecFunciones[0x12], "SUB");
+    strcpy(VecFunciones[0x13], "MUL");
+    strcpy(VecFunciones[0x14], "DIV");
+    strcpy(VecFunciones[0x15], "CMP");
+    strcpy(VecFunciones[0x16], "SHL");
+    strcpy(VecFunciones[0x17], "SHR");
+    strcpy(VecFunciones[0x18], "SAR");
+    strcpy(VecFunciones[0x19], "AND");
+    strcpy(VecFunciones[0x1A], "OR");
+    strcpy(VecFunciones[0x1B], "XOR");
+    strcpy(VecFunciones[0x1C], "SWAP");
+    strcpy(VecFunciones[0x1D], "LDL");
+    strcpy(VecFunciones[0x1E], "LDH");
+    strcpy(VecFunciones[0x1F], "RND");
+
+    //1 Operando
+    strcpy(VecFunciones[0x00], "SYS");
+    strcpy(VecFunciones[0x02], "JZ");
+    strcpy(VecFunciones[0x03], "JP");
+    strcpy(VecFunciones[0x01], "JMP");
+    strcpy(VecFunciones[0x04], "JN");
+    strcpy(VecFunciones[0x05], "JNZ");
+    strcpy(VecFunciones[0x06], "JNP");
+    strcpy(VecFunciones[0x07], "JNN");
+    strcpy(VecFunciones[0x08], "NOT");
+
+    //0 Operandos
+    strcpy(VecFunciones[0x0F], "STOP");
+
+}
+
+void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
+    strcpy(VecRegistros[LAR],"LAR");
+    strcpy(VecRegistros[MAR],"MAR");
+    strcpy(VecRegistros[MBR],"MBR");
+    strcpy(VecRegistros[IP], "IP");
+    strcpy(VecRegistros[OPC], "OPC");
+    strcpy(VecRegistros[OP1], "OP1");
+    strcpy(VecRegistros[OP2], "OP2");
+    strcpy(VecRegistros[7], "");
+    strcpy(VecRegistros[8], "");
+    strcpy(VecRegistros[9], "");
+    strcpy(VecRegistros[EAX], "EAX");
+    strcpy(VecRegistros[EBX], "EBX");
+    strcpy(VecRegistros[ECX], "ECX");
+    strcpy(VecRegistros[EDX], "EDX");
+    strcpy(VecRegistros[EEX], "EEX");
+    strcpy(VecRegistros[EFX], "EFX");
+    strcpy(VecRegistros[CC], "CC");
+    strcpy(VecRegistros[AC], "AC");
+    strcpy(VecRegistros[CS], "CS");
+    strcpy(VecRegistros[DS], "DS");
+}
 
 
 void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga funciones[0] se ejecuta el sys
@@ -54,13 +111,13 @@ void cargaSegmentos(TVM * VM,int tam) {
     VM->segmentos[SEG_DS] = (tam << 16) | (MEMORY_SIZE - tam); //los primeros 2 bytes son la base y los otros dos el tam
 }
 
-void leoArch(TVM * VM) {
+void leoArch(TVM * VM, char nomarch[]) {
     FILE * archb;
     THeader header;
     char t1,t2;
     int i=0;
 
-    archb = fopen("prueba.vmx","rb");
+    archb = fopen(nomarch,"rb");
     if(archb==NULL)
         printf("No se pudo abrir el archivo .asm");
     else {
@@ -957,7 +1014,7 @@ void JZ(TVM *VM, Instruccion instruc) {
 }
 
 void JNZ(TVM *VM, Instruccion instruc) {
-    if (!(VM->reg[CC] & 0x40000000)) {
+    if (!(VM->reg[CC] & 0x40000000)) { //pregunta por el primer bit de cc
         int destino = resolverSaltoSeguro(VM, instruc);
         if (destino != -1) VM->reg[IP] = destino;
     }
@@ -1016,4 +1073,86 @@ void NOT(TVM *VM, Instruccion instruc) {
     // Actualizar banderas
     actualizaCC(VM,resultado);
     printf("VALOR DE CC = %d \n",VM->reg[CC]);
+}
+
+
+
+
+
+// -------------------- DISASSEMBLER ------------------------//
+void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
+
+    unsigned char CodOp;
+    int CantOp,baseCS,tamCS;
+    Instruccion instruc;
+    unsigned short int PosInicial,PosMemoria,PosFinal;
+
+    baseCS = getBase(VM->segmentos[SEG_CS]);
+    tamCS = getTam(VM->segmentos[SEG_CS]);
+
+    PosMemoria = baseCS;
+    PosFinal =  baseCS + tamCS;
+
+    while (PosMemoria < PosFinal) {
+
+        PosInicial=PosMemoria;
+        ComponentesInstruccion(VM,PosMemoria,&instruc,&CantOp,&CodOp);
+        SeteoValorOp(VM,PosMemoria,&instruc);
+
+        PosMemoria += instruc.sizeA+instruc.sizeB+1; // Posicion de la Siguiente instruccion
+        EscriboDissasembler(VM,VecFunciones,VecRegistros,CodOp,instruc,PosInicial,PosMemoria);
+    }
+}
+
+void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegistros[CANTREG][4],
+                         unsigned char CodOp, Instruccion instruc, int PosInicial, int PosFinal) {
+    // 1. Dirección física
+    printf("[%04X] ", PosInicial);
+
+    // 2. Bytes de la instrucción
+    for (int i = PosInicial; i < PosFinal; i++) {
+        printf("%02X ", VM->memory[i]);
+    }
+    // Completar hasta 4 bytes para alinear (opcional)
+    for (int i = PosFinal; i < PosInicial + 4; i++) {
+        printf("   ");
+    }
+
+    printf("| ");
+
+    // 3. Mnemónico
+    printf("%s ", VecFunciones[CodOp]);
+
+    // 4. Operando A
+    if (instruc.sizeA) {
+        if (instruc.sizeA == 1) { // Registro
+            int codReg;
+            DefinoRegistro(&codReg, instruc.valorA);
+            printf("%s", VecRegistros[codReg]);
+        } else if (instruc.sizeA == 2) { // Inmediato
+            printf("%d", instruc.valorA);
+        } else if (instruc.sizeA == 3) { // Memoria
+            int seg = (instruc.valorA & 0xFF0000) >> 16;
+            int off = instruc.valorA & 0xFFFF;
+            printf("[%s+%d]", seg == SEG_DS ? "DS" : "CS", off);
+        }
+    }
+
+    // 5. Operando B
+    if (instruc.sizeB) {
+        printf(", ");
+        if (instruc.sizeB == 1) { // Registro
+            int codReg;
+            DefinoRegistro(&codReg, instruc.valorB);
+            printf("%s", VecRegistros[codReg]);
+        } else if (instruc.sizeB == 2) { // Inmediato
+            printf("%d", instruc.valorB);
+        } else if (instruc.sizeB == 3) { // Memoria
+            int seg = (instruc.valorB & 0xFF0000) >> 16;
+            int off = instruc.valorB & 0xFFFF;
+            printf("[%s+%d]", seg == SEG_DS ? "DS" : "CS", off);
+        }
+    }
+
+    printf("\n");
 }
