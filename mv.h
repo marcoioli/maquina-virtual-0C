@@ -34,6 +34,11 @@
 #define DS 27 //data segment
 //28 - 31 RESERVADOS
 
+#define ERROR_INSTRUCCION 1
+#define ERROR_DIVISION_POR_CERO 2
+#define ERROR_SEGMENTO 3
+#define ERROR_OPERANDO 4
+
 
 typedef struct {
     char id[TAMID]; //caracter por caracter o string?
@@ -109,6 +114,7 @@ void SYS(TVM *VM, Instruccion instruc);
 
 int leer_binario_c2_32();
 void imprimir_binario_32(int valor);
+void imprimir_binario_nbits(int valor,int size);
 
 int random32();
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc);

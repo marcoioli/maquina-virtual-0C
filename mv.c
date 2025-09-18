@@ -98,6 +98,24 @@ void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga
     Funciones[0x1F] = RND;   
 }
 
+void generaerror(int codigo) {
+    switch (codigo) {
+        case ERROR_INSTRUCCION:
+            printf("[ERROR] Instrucción inválida\n");
+            break;
+        case ERROR_DIVISION_POR_CERO:
+            printf("[ERROR] División por cero\n");
+            break;
+        case ERROR_SEGMENTO:
+            printf("[ERROR] Fuera de los limites del segmento\n");
+            break;
+        case ERROR_OPERANDO:
+            printf("[ERROR] Operando inválido\n");
+            break;
+    }
+    exit(EXIT_FAILURE); // Aborta la ejecución
+}
+
 void iniciaRegs(TVM * VM,int tam) {
     VM->reg[CS] = 0x00000000;
     VM->reg[DS] = (1<<16) | 0; //tamanio??
@@ -1095,7 +1113,7 @@ void NOT(TVM *VM, Instruccion instruc) {
     printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
-void SYS(TVM *VM, Instruccion instruc){
+/*void SYS(TVM *VM, Instruccion instruc){
     int servicio, modo, posmemoria, ecx, size, count, logica,   segmento, offset,offset_inicial;
 
     switch (instruc.sizeA) {
@@ -1158,37 +1176,162 @@ void SYS(TVM *VM, Instruccion instruc){
         }
     }
 
-    else if (servicio == 2) {
-        for (int i = 0; i < count; i++) {
-            int offset = offset_inicial + i*size;
-            int dirFis = getDirfisica(VM, offset, segmento, size);
-            if (dirFis == -1) return;
 
-            // Reconstruir valor desde memoria física
-            int valor = 0;
-            for (int j = 0; j < size; j++) {
-                valor = (valor << 8) | (VM->memory[dirFis + j] & 0xFF);
+else if (servicio == 2) {
+    offset_inicial = offset; // <--- ¡CORRECCIÓN AQUÍ!
+    for (int i = 0; i < count; i++) {
+        int offset_actual = offset_inicial + i*size;
+        int dirFis = getDirfisica(VM, offset_actual, segmento, size);
+        if (dirFis == -1) return;
+
+        // Reconstruir valor desde memoria física
+        int valor = 0;
+        for (int j = 0; j < size; j++) {
+            valor = (valor << 8) | (VM->memory[dirFis + j] & 0xFF);
+        }
+
+        // Salida en formato esperado
+        if (modo == 0x02) { // caracter
+            unsigned char ch = valor & 0xFF;
+            printf("[%04X]: 0b", dirFis & 0xFFFF);
+            for (int k = 7; k >= 0; k--) {
+                printf("%d", (ch >> k) & 1);
             }
-
+            printf(" %c\n", isprint(ch) ? ch : '.');
+        } else if (modo == 0x08) { // hex
+            printf("[%04X] 0x%X\n", dirFis & 0xFFFF, valor);
+        } else if (modo == 0x04) { // octal
+            printf("[%04X] 0%o\n", dirFis & 0xFFFF, valor);
+        } else if (modo == 0x10) { // binario
             printf("[%04X] ", dirFis & 0xFFFF);
-
-            if (modo == 0x02) { // caracter
-                if (isprint(valor & 0xFF))
-                    printf("%c\n", valor & 0xFF);
-                else
-                    printf(".\n");
-            } else if (modo == 0x08) { // hex
-                printf("0x%X\n", valor);
-            } else if (modo == 0x04) { // octal
-                printf("0%o\n", valor);
-            } else if (modo == 0x10) { // binario
-                imprimir_binario_32(valor);
-            } else { // decimal
-                printf("%d\n", valor);
-            }
+            imprimir_binario_32(valor);
+        } else { // decimal
+            printf("[%04X] %d\n", dirFis & 0xFFFF, valor);
         }
     }
 }
+}
+*/
+
+void SYS(TVM *VM, Instruccion instruc) {
+    int servicio = 0;
+    int modo, posmemoria, ecx, size, count, logica, segmento, offset, offset_inicial;
+
+    // Determinar servicio (SYS <n>)
+    switch (instruc.sizeA) {
+        case 2: // inmediato
+            servicio = instruc.valorA;
+            break;
+        case 1: { // registro
+            int codReg;
+            DefinoRegistro(&codReg, instruc.valorA);
+            servicio = VM->reg[codReg];
+            break;
+        }
+        case 3: // memoria
+            servicio = leerMemoria(VM, VM->reg[OP1], 4);
+            break;
+    }
+
+    // Configuración desde registros
+    modo = VM->reg[EAX];      // máscara de modos
+    ecx = VM->reg[ECX];       // cantidad y tamaño
+    size = (ecx >> 16) & 0xFFFF;  // bytes por celda
+    count = ecx & 0xFFFF;        // cantidad de celdas
+    logica = VM->reg[EDX];       // dirección lógica
+    segmento = (logica >> 16) & 0xFFFF;
+    offset = (logica & 0xFFFF);
+
+    // ---- SERVICIO 1: READ ----
+    if (servicio == 1) {
+        for (int i = 0; i < count; i++) {
+            int offset_actual = offset + i * size;
+            int dirFis = getDirfisica(VM, offset_actual, segmento, size);
+            if (dirFis == -1) return; // error de acceso
+
+            printf("[%04X]: ", dirFis & 0xFFFF);
+
+            int numero = 0;
+
+            if (modo & 0x10) { // binario
+                numero = leer_binario_c2_32();
+            } else if (modo & 0x08) { // hex
+                scanf("%X", &numero);
+            } else if (modo & 0x04) { // octal
+                scanf("%o", &numero);
+            } else if (modo & 0x02) { // char
+                char c;
+                scanf(" %c", &c);
+                numero = (int)c;
+            } else { // decimal por defecto
+                scanf("%d", &numero);
+            }
+
+            // Guardar en memoria (LITTLE ENDIAN)
+           /* if (size == 1) {
+                VM->memory[dirFis] = numero & 0xFF;
+            } else if (size == 2) {
+                VM->memory[dirFis]     = numero & 0xFF;
+                VM->memory[dirFis + 1] = (numero >> 8) & 0xFF;
+            } else if (size == 4) {
+                for (int j = 0; j < 4; j++) {
+                    VM->memory[dirFis + j] = (numero >> (8 * j)) & 0xFF;
+                }
+            }
+           */   
+           
+            //guarda en LITTLE ENDIAN SIEMPRE
+           for (int j = 0; j < size; j++) {
+              VM->memory[dirFis + j] = (numero >> (8 * (size - 1 - j))) & 0xFF;
+           }
+}  
+    }
+    // ---- SERVICIO 2: WRITE ----
+    else if (servicio == 2) {
+        offset_inicial = offset;
+        for (int i = 0; i < count; i++) {
+            int offset_actual = offset_inicial + i * size;
+            int dirFis = getDirfisica(VM, offset_actual, segmento, size);
+            if (dirFis == -1) return;
+            int valor;
+
+            // Reconstruir valor desde memoria física (big)
+                // modo por defecto: big endian (MOV, SHL, OR)
+                for (int j = 0; j < size; j++) {
+                 valor = (valor << 8) | (VM->memory[dirFis + j] & 0xFF);
+                }
+
+            
+
+            // Imprimir en los formatos activados
+            printf("[%04X]: ", dirFis & 0xFFFF);
+
+            if (modo & 0x10) { // binario
+                imprimir_binario_nbits(valor, size * 8); // usa 8, 16 o 32 bits
+                printf(" ");
+            }
+            if (modo & 0x08) { // hex
+                printf("0x%X ", valor);
+            }
+            if (modo & 0x04) { // octal
+                printf("0o%o ", valor);
+            }
+            if (modo & 0x02) { // caracter
+                for (int j = size - 1; j >= 0; j--) {
+                unsigned char ch = (valor >> (8 * j)) & 0xFF;
+                printf("%c", isprint(ch) ? ch : '.');
+             }
+              printf(" ");
+            }
+            if (modo & 0x01) { // decimal
+                printf("%d ", valor);
+            }
+
+            printf("\n");
+        }
+    }
+}
+
 
 int leer_binario_c2_32() {
     char buffer[33];
@@ -1220,6 +1363,13 @@ void imprimir_binario_32(int valor) {
     }
     printf("\n");
 }
+
+void imprimir_binario_nbits(int valor, int bits) {
+    for (int i = bits - 1; i >= 0; i--) {
+        printf("%d", (valor >> i) & 1);
+    }
+}
+
 
 // -------------------- DISASSEMBLER ------------------------//
 void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
@@ -1299,21 +1449,5 @@ void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegist
     printf("\n");
 }
 
-void generaerror(int codigo) {
-    switch (codigo) {
-        case ERROR_INSTRUCCION:
-            printf("[ERROR] Instrucción inválida\n");
-            break;
-        case ERROR_DIVISION_POR_CERO:
-            printf("[ERROR] División por cero\n");
-            break;
-        case ERROR_SEGMENTO:
-            printf("[ERROR] Fuera de los limites del segmento\n");
-            break;
-        case ERROR_OPERANDO:
-            printf("[ERROR] Operando inválido\n");
-            break;
-    }
-    exit(EXIT_FAILURE); // Aborta la ejecución
-}
+
 
