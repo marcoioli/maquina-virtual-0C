@@ -1293,15 +1293,13 @@ void SYS(TVM *VM, Instruccion instruc) {
             int offset_actual = offset_inicial + i * size;
             int dirFis = getDirfisica(VM, offset_actual, segmento, size);
             if (dirFis == -1) return;
-            int valor;
+            int valor=0;
 
             // Reconstruir valor desde memoria física (big)
                 // modo por defecto: big endian (MOV, SHL, OR)
                 for (int j = 0; j < size; j++) {
                  valor = (valor << 8) | (VM->memory[dirFis + j] & 0xFF);
                 }
-
-            
 
             // Imprimir en los formatos activados
             printf("[%04X]: ", dirFis & 0xFFFF);
