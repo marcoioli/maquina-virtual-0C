@@ -69,7 +69,7 @@ void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga
     //Funciones[0x0F] = STOP;  // No implementada aún
     
     // Instrucciones con un operando  
-   // Funciones[0x00] = SYS;   
+    Funciones[0x00] = SYS;   
     Funciones[0x01] = JMP;  
     Funciones[0x02] = JZ;    
     Funciones[0x03] = JP;
@@ -179,10 +179,11 @@ int getDirfisica(TVM *VM, int offset,int segmento, int size) {
         base = (VM->segmentos[segmento] & 0xFFFF0000) >> 16; //base del segmento 
         tam = (VM->segmentos[segmento]&0x0000FFFF);
         int dirFisica = base+offset;
-        if (dirFisica > base && dirFisica < tam ) //+ inicial
+        if (dirFisica >= base && dirFisica < tam ) //+ inicial
             return dirFisica;
         else {
-            printf("[ERROR] ACCEDIENDO A DIRECCION MENOR A LA BASE O MAYOR AL TAMANIO");
+            printf("[ERROR] ACCEDIENDO A DIRECCION MENOR A LA BASE O MAYOR AL TAMANIO \n");
+            printf("DIRFISICA %08X, BASE=%08X, TAMANIO= %08X \n",dirFisica, base, tam);
             return -1;
         }
     }
@@ -1090,7 +1091,7 @@ void SYS(TVM *VM, Instruccion instruc){
             break;
         }
         case 3: // memoria
-            servicio = leerMemoria(VM, instruc.valorA, 4);
+            servicio = leerMemoria(VM, VM->reg[OP1], 4);
             break;
     }
 
