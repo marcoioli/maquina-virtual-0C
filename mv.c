@@ -1171,8 +1171,36 @@ void SYS(TVM *VM, Instruccion instruc){
     }
 }
 
+int leer_binario_c2_32() {
+    char buffer[33];
+    int resultado = 0;
+    int signo = 1;
 
+    scanf("%32s", buffer);
 
+    // Si empieza con '-', es negativo
+    if (buffer[0] == '-') {
+        signo = -1;
+        memmove(buffer, buffer + 1, strlen(buffer));
+    }
+
+    for (int i = 0; buffer[i] != '\0'; i++) {
+        resultado <<= 1;
+        if (buffer[i] == '1') resultado |= 1;
+        else if (buffer[i] != '0') break; // Ignora caracteres no binarios
+    }
+
+    if (signo == -1) resultado = -resultado;
+    return resultado;
+}
+
+void imprimir_binario_32(int valor) {
+    for (int i = 31; i >= 0; i--) {
+        printf("%d", (valor >> i) & 1);
+        if (i % 8 == 0 && i != 0) printf(" ");
+    }
+    printf("\n");
+}
 
 // -------------------- DISASSEMBLER ------------------------//
 void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
