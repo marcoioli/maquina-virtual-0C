@@ -111,6 +111,7 @@ void JP(TVM *VM, Instruccion instruc);
 void JNP(TVM *VM, Instruccion instruc);
 void NOT(TVM *VM, Instruccion instruc);
 void SYS(TVM *VM, Instruccion instruc);
+void STOP(TVM * VM,Instruccion instruc);
 
 int leer_binario_c2_32();
 void imprimir_binario_32(int valor);

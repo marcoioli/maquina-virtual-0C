@@ -66,7 +66,7 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
 
 void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga funciones[0] se ejecuta el sys
  // Instrucciones sin operandos
-    //Funciones[0x0F] = STOP;  // No implementada aún
+    Funciones[0x0F] = STOP;  // No implementada aún
     
     // Instrucciones con un operando  
     Funciones[0x00] = SYS;   
@@ -332,8 +332,12 @@ void leeIP(TVM *VM) {
             printf("OP2 = %08X \n",VM->reg[OP2]);
 
 
+            printf("[DEBUG] codOp=%02X (%d)\n", codOp, codOp);
+
+            int ip_anterior = VM->reg[IP];
+
             // hace la funcion
-            if (!((codOp <= 0x08) || (codOp >= 0x10 && codOp <= 0x1F))) {
+            if (!((codOp <= 0x08) || (codOp >= 0x10 && codOp<= 0x1F))) {
                 printf("[ERROR] Código de operación inválido: %02X\n", codOp);
                 ejecutando = 0;  // fin por error
             } else if (Funciones[codOp] != NULL) {
@@ -344,8 +348,9 @@ void leeIP(TVM *VM) {
             }
 
             // actualiza ip
+            if (VM->reg[IP] == ip_anterior ) {
             VM->reg[IP] += 1 + instruc.sizeA + instruc.sizeB;
-
+            }   
             // Condición de parada por STOP
             if (VM->reg[IP] == -1) {
                 printf("[STOP] Ejecución finalizada por instrucción STOP\n");
@@ -384,7 +389,14 @@ void escribeMemoria(TVM * VM,int OP,int valor, int size) {
     csact = (VM->reg[regact] & 0xFFFF0000) >> 16; //codigo de segmento de op recibido
     offop = OP & 0x0000FFFF; //offset del op recibido
     offreg = (VM->reg[regact] & 0x0000FFFF); //offset del registro 
-    offset = offreg + offop;
+
+     // Si regact es DS o CS, y offreg==0, acceso directo
+    if ((regact == DS || regact == CS) && offreg == 0) {
+        offset = offop;
+    } else {
+        offset = offreg + offop;
+    }
+
     VM->reg[LAR] = csact << 16 | offset;
 
     // 2. Traducir dirección lógica a física
@@ -1008,7 +1020,7 @@ void RND(TVM *VM, Instruccion instruc) {
     }
 }
 
-int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
+/*int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
     int codReg, destino;
 
     //Resolver operando A
@@ -1037,7 +1049,38 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
         generaerror(ERROR_SEGMENTO);
     }
 
-    return destino;
+    return destino-baseCS;
+}
+*/
+
+int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
+    int codReg, offset;
+
+    // Resolver operando A (el destino del salto)
+    switch (instruc.sizeA) {
+        case 2: // inmediato
+            offset = instruc.valorA;
+            break;
+        case 1: // registro
+            DefinoRegistro(&codReg, instruc.valorA);
+            offset = VM->reg[codReg];
+            break;
+        case 3: // memoria
+            offset = leerMemoria(VM, VM->reg[OP1], 4);
+            break;
+        default:
+            generaerror(ERROR_OPERANDO);
+            return -1;
+    }
+
+    // Validar que el offset esté dentro del segmento de código
+    int tamCS = getTam(VM->segmentos[SEG_CS]);
+    if (offset < 0 || offset >= tamCS) {
+        generaerror(ERROR_SEGMENTO);
+        return -1;
+    }
+
+    return offset; // <-- Retorna offset lógico, NO dirección física
 }
 
 void JMP(TVM *VM, Instruccion instruc) {
@@ -1111,6 +1154,10 @@ void NOT(TVM *VM, Instruccion instruc) {
     // Actualizar banderas
     actualizaCC(VM,resultado);
     printf("VALOR DE CC = %d \n",VM->reg[CC]);
+}
+
+void STOP(TVM * VM,Instruccion instruc) {
+    exit (0);
 }
 
 /*void SYS(TVM *VM, Instruccion instruc){
