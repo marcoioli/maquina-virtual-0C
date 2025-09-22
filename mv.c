@@ -1328,6 +1328,7 @@ void SYS(TVM *VM, Instruccion instruc) {
            */   
            
             //guarda en LITTLE ENDIAN SIEMPRE
+            //deberia ser BIG ENDIAN????
            for (int j = 0; j < size; j++) {
               VM->memory[dirFis + j] = (numero >> (8 * (size - 1 - j))) & 0xFF;
            }
