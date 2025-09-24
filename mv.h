@@ -40,8 +40,8 @@
 #define ERROR_OPERANDO 4
 
 
-typedef struct {
-    char id[TAMID]; //caracter por caracter o string?
+typedef struct THeader{
+    unsigned char c1,c2,c3,c4,c5;  //caracter por caracter o string?
     char version;
     unsigned short int tam;
 }THeader;
