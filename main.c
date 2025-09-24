@@ -25,14 +25,14 @@ int main(int argc, char *argv[]) {
     printf("Comienza a leer IP \n");
     leeIP(&VM);
  
-    /*
+    
     printf("EAX = %d (0x%08X)\n", VM.reg[EAX], VM.reg[EAX]);
     printf("EBX = %d (0x%08X)\n", VM.reg[EBX], VM.reg[EBX]);
     printf("ECX = %d (0x%08X)\n", VM.reg[ECX], VM.reg[ECX]);
     printf("EDX = %d (0x%08X)\n", VM.reg[EDX], VM.reg[EDX]);
     printf("AC  = %d (0x%08X)\n", VM.reg[AC], VM.reg[AC]);
     printf("CC  = %d (0x%08X)\n", VM.reg[CC], VM.reg[CC]);
-    */
+    
 
     return 0;
 }
