@@ -120,6 +120,7 @@ void iniciaRegs(TVM * VM,int tam) {
     VM->reg[CS] = 0x00000000;
     VM->reg[DS] = (1<<16) | 0; //tamanio??
     VM->reg[IP] = VM->reg[CS];
+    VM->reg[AC] = 0;
 }
 
 void cargaSegmentos(TVM * VM,int tam) {
@@ -129,11 +130,7 @@ void cargaSegmentos(TVM * VM,int tam) {
     */
     VM->segmentos[SEG_DS] = (tam << 16) | (MEMORY_SIZE - tam); //los primeros 2 bytes son la base y los otros dos el tam
 
-    /*
-    int baseDS = getBase(VM->segmentos[SEG_DS]);
-    int tamDS = getTam(VM->segmentos[SEG_DS]);
-    memset(VM->memory + baseDS, 0, tamDS);
-    */
+
 
 }
 
@@ -310,7 +307,7 @@ void leeIP(TVM *VM) {
     size = getTam(VM->segmentos[segIndex]);
 
     
-//    printf("[DEBUG] Inicio ejecución | segIndex=%d base=%d size=%d\n ac=%d", segIndex, base, size,VM->reg[AC]);
+  printf("[DEBUG] Inicio ejecución | segIndex=%d base=%d size=%d\n ac=%d", segIndex, base, size,VM->reg[AC]);
  //   printf("[SEGMENTOS] CODE SEGMENT %08X -- DATA SEGMENT %08X \n",VM->segmentos[SEG_CS],VM->segmentos[SEG_DS]);
   // printf("VALORES INICIALES CS=%08X DS=%08X IP=%08X \n",VM->reg[CS],VM->reg[DS],VM->reg[IP]);
     
@@ -329,8 +326,8 @@ void leeIP(TVM *VM) {
             unsigned char rawInstr = VM->memory[dirFisica];
             ComponentesInstruccion(VM, dirFisica, &instruc, &cantOp, &codOp);
 
-      //      printf("[FETCH] IP=%08X | DirFisica=%04X | rawInstr=%02X | codOp=%02X | sizeA=%d sizeB=%d cantOp=%d AC=%d\n",
-      //             VM->reg[IP], dirFisica, rawInstr, codOp, instruc.sizeA, instruc.sizeB, cantOp,VM->reg[AC]);
+            printf("[FETCH] IP=%08X | DirFisica=%04X | rawInstr=%02X | codOp=%02X | sizeA=%d sizeB=%d cantOp=%d AC=%d\n",
+                   VM->reg[IP], dirFisica, rawInstr, codOp, instruc.sizeA, instruc.sizeB, cantOp,VM->reg[AC]);
 
             // lee operandos
             if (cantOp > 0) {
@@ -376,10 +373,10 @@ void leeIP(TVM *VM) {
             }
 
             // Debug de registros después de ejecutar
-     //    printf("[DEBUG] Regs: EAX=%08X EBX=%08X ECX=%08X EDX=%08X AC=%08X CC=%08X IP=%08X\n",
-     //              VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX],
-      //             VM->reg[AC], VM->reg[CC], VM->reg[IP]);
-     //    printf("\n");
+         printf("[DEBUG] Regs: EAX=%08X EBX=%08X ECX=%08X EDX=%08X AC=%08X CC=%08X IP=%08X\n",
+                   VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX],
+                  VM->reg[AC], VM->reg[CC], VM->reg[IP]);
+         printf("\n");
         }
     }
 }
@@ -1395,7 +1392,7 @@ void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegist
         } else if (instruc.sizeA == 3) { // Memoria
             int seg = (instruc.valorA & 0xFF0000) >> 16;
             int off = instruc.valorA & 0xFFFF;
-            printf("[%s+%d]", seg == DS ? "DS" : "CS", off);
+            printf("[%s+%d]", VecRegistros[seg], off);
         }
     }
 
@@ -1411,7 +1408,7 @@ void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegist
         } else if (instruc.sizeB == 3) { // Memoria
             int seg = (instruc.valorB & 0xFF0000) >> 16;
             int off = instruc.valorB & 0xFFFF;
-            printf("[%s+%d]", seg == DS ? "DS" : "CS", off);
+            printf("[%s+%d]", VecRegistros[seg],off);
         }
     }
 
