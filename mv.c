@@ -209,7 +209,7 @@ int getDirfisica(TVM *VM, int offset,int segmento, int size) {
         base = (VM->segmentos[segmento] & 0xFFFF0000) >> 16; //base del segmento 
         tam = (VM->segmentos[segmento]&0x0000FFFF);
         int dirFisica = base+offset;
-        if (dirFisica >= base && dirFisica < tam ) //+ inicial
+        if (dirFisica >= base && (dirFisica + size - 1) < (base + tam )) //+ inicial
             return dirFisica;
         else {
        //   printf("[ERROR] ACCEDIENDO A DIRECCION MENOR A LA BASE O MAYOR AL TAMANIO \n");
@@ -408,11 +408,20 @@ void escribeMemoria(TVM * VM,int OP,int valor, int size) {
     // 2. Traducir dirección lógica a física
     int dirFis = getDirfisica(VM, offset,csact, size); //dir fiscia va a ser base segmento + offset
 
+    /*
+        if (dirFis == -1) {
+        generaerror(ERROR_SEGMENTO);
+        return; // Retornar valor por defecto
+    }
+        */
+
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
 
     // 4. Cargar en MBR
     VM->reg[MBR] = valor;
+
+    
 
 
    // printf("LAR : %08X \n",VM->reg[LAR]);
@@ -443,6 +452,13 @@ int leerMemoria (TVM*VM, int OP,int size) {
     VM->reg[LAR] = csact << 16 | offset;
 
     int dirFis = getDirfisica(VM,offset,csact,size);
+
+    /* error de segmento
+        if (dirFis == -1) {
+        generaerror(ERROR_SEGMENTO);
+        return 0; // Retornar valor por defecto
+    }
+        */
 
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
 
