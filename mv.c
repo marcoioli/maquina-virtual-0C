@@ -373,8 +373,8 @@ void leeIP(TVM *VM) {
             }
 
             // Debug de registros después de ejecutar
-         printf("[DEBUG] Regs: EAX=%08X EBX=%08X ECX=%08X EDX=%08X AC=%08X CC=%08X IP=%08X\n",
-                   VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX],
+         printf("[DEBUG] Regs: EAX=%08X EBX=%08X ECX=%08X EDX=%08X EFX=%08X AC=%08X CC=%08X IP=%08X\n",
+                   VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX],VM->reg[EFX],
                   VM->reg[AC], VM->reg[CC], VM->reg[IP]);
          printf("\n");
         }
@@ -408,13 +408,12 @@ void escribeMemoria(TVM * VM,int OP,int valor, int size) {
     // 2. Traducir dirección lógica a física
     int dirFis = getDirfisica(VM, offset,csact, size); //dir fiscia va a ser base segmento + offset
 
-    /*
+    //error de segmento
         if (dirFis == -1) {
         generaerror(ERROR_SEGMENTO);
         return; // Retornar valor por defecto
     }
-        */
-
+    
     // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
 
@@ -453,12 +452,12 @@ int leerMemoria (TVM*VM, int OP,int size) {
 
     int dirFis = getDirfisica(VM,offset,csact,size);
 
-    /* error de segmento
+     //error de segmento
         if (dirFis == -1) {
         generaerror(ERROR_SEGMENTO);
         return 0; // Retornar valor por defecto
     }
-        */
+    
 
     VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
 
