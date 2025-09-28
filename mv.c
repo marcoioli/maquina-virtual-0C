@@ -168,9 +168,9 @@ void leoArch(TVM * VM, char nomarch[]) {
         //AGREGAR VALIDACIONES DE HEADER
          if(strcmp(id, "VMX25") == 0 && header.version ==1) {
                 cargaSegmentos(VM,header.tam);
-               printf("Segmentos: CS=%08X, DS=%08X\n", VM->segmentos[CS], VM->segmentos[DS]);
+           //    printf("Segmentos: CS=%08X, DS=%08X\n", VM->segmentos[CS], VM->segmentos[DS]);
                 iniciaRegs(VM,header.tam);
-               printf("Registros iniciales: CS=%08X, DS=%08X, IP=%08X\n", VM->reg[CS], VM->reg[DS], VM->reg[IP]);
+            //   printf("Registros iniciales: CS=%08X, DS=%08X, IP=%08X\n", VM->reg[CS], VM->reg[DS], VM->reg[IP]);
                 //carga memoria
 
                 while(fread(&(VM->memory[i]),1,1,archb)==1) {
@@ -307,7 +307,7 @@ void leeIP(TVM *VM) {
     size = getTam(VM->segmentos[segIndex]);
 
     
-  printf("[DEBUG] Inicio ejecución | segIndex=%d base=%d size=%d\n ac=%d", segIndex, base, size,VM->reg[AC]);
+  //printf("[DEBUG] Inicio ejecución | segIndex=%d base=%d size=%d\n ac=%d", segIndex, base, size,VM->reg[AC]);
  //   printf("[SEGMENTOS] CODE SEGMENT %08X -- DATA SEGMENT %08X \n",VM->segmentos[SEG_CS],VM->segmentos[SEG_DS]);
   // printf("VALORES INICIALES CS=%08X DS=%08X IP=%08X \n",VM->reg[CS],VM->reg[DS],VM->reg[IP]);
     
@@ -326,8 +326,8 @@ void leeIP(TVM *VM) {
             unsigned char rawInstr = VM->memory[dirFisica];
             ComponentesInstruccion(VM, dirFisica, &instruc, &cantOp, &codOp);
 
-            printf("[FETCH] IP=%08X | DirFisica=%04X | rawInstr=%02X | codOp=%02X | sizeA=%d sizeB=%d cantOp=%d AC=%d\n",
-                   VM->reg[IP], dirFisica, rawInstr, codOp, instruc.sizeA, instruc.sizeB, cantOp,VM->reg[AC]);
+        //    printf("[FETCH] IP=%08X | DirFisica=%04X | rawInstr=%02X | codOp=%02X | sizeA=%d sizeB=%d cantOp=%d AC=%d\n",
+         //          VM->reg[IP], dirFisica, rawInstr, codOp, instruc.sizeA, instruc.sizeB, cantOp,VM->reg[AC]);
 
             // lee operandos
             if (cantOp > 0) {
@@ -353,7 +353,7 @@ void leeIP(TVM *VM) {
 
             // hace la funcion
             if (!((codOp <= 0x08) || (codOp >= 0x10 && codOp<= 0x1F))) {
-       //        printf("[ERROR] Código de operación inválido: %02X\n", codOp);
+               printf("[ERROR] Código de operación inválido: %02X\n", codOp);
                 ejecutando = 0;  // fin por error
             } else if (Funciones[codOp] != NULL) {
         //       printf("[EXECUTE] Ejecutando opcode %02X...\n", codOp);
@@ -373,10 +373,10 @@ void leeIP(TVM *VM) {
             }
 
             // Debug de registros después de ejecutar
-         printf("[DEBUG] Regs: EAX=%08X EBX=%08X ECX=%08X EDX=%08X EFX=%08X AC=%08X CC=%08X IP=%08X\n",
-                   VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX],VM->reg[EFX],
-                  VM->reg[AC], VM->reg[CC], VM->reg[IP]);
-         printf("\n");
+       //  printf("[DEBUG] Regs: EAX=%08X EBX=%08X ECX=%08X EDX=%08X EFX=%08X AC=%08X CC=%08X IP=%08X\n",
+       //            VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX],VM->reg[EFX],
+       //           VM->reg[AC], VM->reg[CC], VM->reg[IP]);
+       //  printf("\n");
         }
     }
 }
