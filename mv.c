@@ -202,7 +202,7 @@ int getDirfisica(TVM *VM, int offset,int segmento, int size) {
 
     int base,tam;
 
-    if (segmento > CANTSEGMENTOS) {
+    if (segmento > CANTSEGMENTOS) { // ya no es fijo crear variable segm_count al leer archivo
         generaerror(ERROR_SEGMENTO);
     }
     else {
@@ -355,7 +355,7 @@ void leeIP(TVM *VM) {
             if (VM->reg[IP] == ip_anterior ) {
             VM->reg[IP] += 1 + instruc.sizeA + instruc.sizeB;
             }
-              
+
             // hace la funcion
             if (!((codOp <= 0x08) || (codOp >= 0x10 && codOp<= 0x1F))) {
                printf("[ERROR] Código de operación inválido: %02X\n", codOp);
@@ -381,10 +381,40 @@ void leeIP(TVM *VM) {
     }
 }
 
-void DefinoRegistro(int *CodReg, int Op){
-  *CodReg = Op & 0x1F;
-}// Devuelve codigo de registro
+void DefinoRegistro(int *codReg, int *sector, int op) {
+    *codReg = op & 0x1F;        
+    *sector = (op >> 5) & 0x03; 
+}
 
+void LeerSectorRegistro(int *AuxR,TVM * VM,unsigned char Sec,int CodReg){ 
+  int CorroSigno=0;
+  if (Sec == 1){
+        *AuxR = VM.reg[CodReg] & 0XFF;
+        CorroSigno = 24;
+    }
+  else if (Sec == 2){
+        *AuxR = (VM.reg[CodReg] & 0XFF00) >> 8;
+        CorroSigno = 16;
+    }
+  else if (Sec == 3){
+        *AuxR = VM.reg[CodReg] & 0XFFFF;
+        CorroSigno = 16;
+    }
+  else
+        *AuxR = VM.reg[CodReg];
+
+  *AuxR = *AuxR << CorroSigno;
+  *AuxR = *AuxR >> CorroSigno;
+}
+
+void escribirSectorRegistro(TVM *VM, int codReg, int sec, int nuevoValor) {
+    switch (sec) {
+        case 0: VM->reg[codReg] = nuevoValor; break;
+        case 1: VM->reg[codReg] = (VM->reg[codReg] & 0xFFFFFF00) | (nuevoValor & 0xFF); break;
+        case 2: VM->reg[codReg] = (VM->reg[codReg] & 0xFFFF00FF) | ((nuevoValor & 0xFF) << 8); break;
+        case 3: VM->reg[codReg] = (VM->reg[codReg] & 0xFFFF0000) | (nuevoValor & 0xFFFF); break;
+    }
+}
 
 void escribeMemoria(TVM * VM,int OP,int valor, int size) {
     
@@ -481,571 +511,391 @@ void actualizaCC(TVM *VM, int resultado) {
 }
 
 
-int guardaB(TVM *VM, Instruccion instruc) {
-    int valorB = 0, codReg;
-
-   //   printf("INTRUC B : %d",instruc.sizeB);
-   // printf("\n");
+void guardaB(TVM *VM, Instruccion instruc, int *auxOpB) {
+    int codReg;
+    unsigned char SecB, CodOpB;
 
     switch (instruc.sizeB) {
         case 2: // inmediato
-            valorB = instruc.valorB;
+            *auxOpB = instruc.valorB;
             break;
+
         case 1: // registro
-            DefinoRegistro(&codReg, instruc.valorB);
-            valorB = VM->reg[codReg];
+            DefinoRegistro(&CodOpB, &SecB, instruc.valorB);
+            LeerSectorRegistro(auxOpB, VM, SecB, CodOpB);
             break;
 
         case 3: // memoria
-       //printf("YENDO A LEER A MEMORIA \n");
-            valorB = leerMemoria(VM,VM->reg[OP2], 4);
+            *auxOpB = leerMemoria(VM, VM->reg[OP2], 4);
             break;
 
         default:
             generaerror(ERROR_OPERANDO);
             break;
     }
-
-    return valorB;
 }
 
 
-void MOV(TVM * VM,Instruccion instruc) {
+void MOV(TVM *VM, Instruccion instruc) {
+    unsigned char SecA, SecB;
+    int CodOpA, CodOpB;
+    int valorA = 0, valorB = 0;
 
-  int valor,codReg;
-  //MOV A,B;
+    guardaB(VM, instruc, &valorB);
 
-  valor = guardaB(VM,instruc);
-
- // printf("EJECUTANDO MOV \n");
-  
-  
-  switch (instruc.sizeA) {
-     case 1:
-            DefinoRegistro(&codReg,instruc.valorA);
-            VM->reg[codReg]=valor;
-    //    printf("Valor : %08X CodReg : %d \n",valor,codReg);
-            break;
-     case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-     case 3: 
-            escribeMemoria(VM,VM->reg[OP1],valor,4); //valor es el valor de b a escribir en memoria
-            break;
- }
+    if (instruc.sizeA == 1) { 
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        escribirSectorRegistro(VM, CodOpA, SecA, valorB);
+    }
+    else if (instruc.sizeA == 3) {
+        escribeMemoria(VM, instruc.valorA, valorB, 4);
+    }
+    else generaerror(ERROR_OPERANDO);
 }
+
+
 
 void ADD(TVM *VM, Instruccion instruc) {
-    int valorA = 0, valorB = 0, codReg;
-    int resultado = 0;
+    unsigned char SecA, CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    valorB = guardaB(VM,instruc);
-    switch (instruc.sizeA) {
-        case 1:
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3: 
-            valorA = leerMemoria(VM,VM->reg[OP1], 4);
-            break;
-    }
-    resultado = valorA + valorB;
+    guardaB(VM, instruc, &valorB);
 
-    //guardar en A
-    switch (instruc.sizeA) {
-        case 1: //reg
-            DefinoRegistro(&codReg, instruc.valorA);
-            VM->reg[codReg] = resultado;
-            break;
-        case 3: //memoria
-            escribeMemoria(VM, VM->reg[OP1], resultado, 4);
-            break;
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA,&SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+
+        resultado = valorA + valorB;
+        EscribirSectorRegistro(VM, SecA, CodOpA, resultado);
     }
+    else if (instruc.sizeA == 3) { 
+        // Memoria
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = valorA + valorB;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
+    }
+    else generaerror(ERROR_OPERANDO);
+
     actualizaCC(VM, resultado);
-  // printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 void SUB(TVM *VM, Instruccion instruc) {
-    int valorA = 0, valorB = 0, resultado = 0, codReg;
+    unsigned char SecA, CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    //valor b
-    valorB = guardaB(VM, instruc);
+    guardaB(VM, instruc, &valorB);
 
-    //obtiene valor de a
-    switch (instruc.sizeA) {
-        case 1: // registro
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3: // memoria
-            valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA,&SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+
+        resultado = valorA - valorB;
+        EscribirSectorRegistro(VM, SecA, CodOpA, resultado);
     }
-
-    resultado = valorA - valorB;
+    else if (instruc.sizeA == 3) { 
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = valorA - valorB;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
+    }
+    else generaerror(ERROR_OPERANDO);
 
     actualizaCC(VM, resultado);
-  // printf("VALOR DE CC = %d \n",VM->reg[CC]);
-
-    //guarda
-    switch (instruc.sizeA) {
-        case 1: // registro
-            DefinoRegistro(&codReg, instruc.valorA);
-            VM->reg[codReg] = resultado;
-            break;
-
-        case 3: // memoria
-            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
-            break;
-    }
 }
 
 void MUL(TVM *VM, Instruccion instruc) {
-    int valorA = 0, valorB = 0, resultado = 0, codReg;
+    unsigned char SecA, CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    valorB = guardaB(VM, instruc);
+    guardaB(VM, instruc, &valorB);
 
-  //  printf("EJECUTANDO MUL \n");
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA,&SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
 
-    switch (instruc.sizeA) {
-        case 1:
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3:
-      //     printf("YENDO A LEER A MEMORIA LO QUE HAY EN OP A \n");
-      //     printf("INSTRUC VALOR A :%08X \n",instruc.valorA);
-            valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
+        resultado = valorA * valorB;
+        EscribirSectorRegistro(VM, SecA, CodOpA, resultado);
     }
-
-    resultado = valorA * valorB;
+    else generaerror(ERROR_OPERANDO);
 
     actualizaCC(VM, resultado);
-  //  printf("VALOR DE CC = %d \n",VM->reg[CC]);
-
-    switch (instruc.sizeA) {
-        case 1:
-            DefinoRegistro(&codReg, instruc.valorA);
-            VM->reg[codReg] = resultado;
-            break;
-        case 3:
-     //       printf("YENDO A ESCRIBIR EN MEMORIA \n");
-            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
-            break;
-    }
 }
 
 void DIV(TVM *VM, Instruccion instruc) {
-    int valorA = 0, valorB = 0, cociente = 0, resto = 0, codReg;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0, resto = 0;
 
-    valorB = guardaB(VM, instruc);
+    // Obtengo el operando B
+    guardaB(VM, instruc, &valorB);
 
-    switch (instruc.sizeA) {
-        case 1:
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3:
-            valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
-    }
-    if (valorB!= 0) {
-      cociente = valorA / valorB;
-      resto = valorA % valorB;
-    } 
-    else
+    // Verifico división por cero
+    if (valorB == 0) {
         generaerror(ERROR_DIVISION_POR_CERO);
-
-    actualizaCC(VM, cociente);
-   // printf("VALOR DE CC = %08X \n",VM->reg[CC]);
-
-    // Guardar cociente en A
-    switch (instruc.sizeA) {
-        case 1:
-            DefinoRegistro(&codReg, instruc.valorA);
-            VM->reg[codReg] = cociente;
-            break;
-        case 3:
-            escribeMemoria(VM,VM->reg[OP1],cociente, 4);
-            break;
+        return;
     }
 
-    // Guardar resto en AC
-    VM->reg[AC] = resto;
+    // Caso A = registro
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+
+        resultado = valorA / valorB;
+        resto = valorA % valorB;
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
+    }
+
+    // Caso A = memoria
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = valorA / valorB;
+        resto = valorA % valorB;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
+    }
+
+    // Operando inválido
+    else generaerror(ERROR_OPERANDO);
+
+    // Actualizo código de condición
+    actualizaCC(VM, resultado);
+
+    VM->reg[AC] = resto; // Guardo el resto en AC
 }
 
 void CMP(TVM *VM, Instruccion instruc) {
-    int valorA = 0, valorB = 0, resultado = 0, codReg;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    valorB = guardaB(VM, instruc);  
-    switch (instruc.sizeA) {
-        case 1: // registro
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
+    guardaB(VM, instruc, &valorB);
 
-        case 3: // memoria
-            valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
     }
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+    }
+    else generaerror(ERROR_OPERANDO);
 
     resultado = valorA - valorB;
     actualizaCC(VM, resultado);
-  //  printf("VALOR DE CC = %d \n",VM->reg[CC]);
-    
-    // no guarda resultado
 }
 
 void SHL(TVM *VM, Instruccion instruc) {
-    int valorA = 0, desplazamientos = 0, resultado = 0, codReg;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    // 
-    desplazamientos = guardaB(VM, instruc);
+    guardaB(VM, instruc, &valorB); // cantidad de bits a desplazar
 
-    switch (instruc.sizeA) {
-        case 1:
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3:
-            valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
-    }
-
-    resultado = valorA << desplazamientos;
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+        resultado = valorA << valorB;
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
+    } 
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = valorA << valorB;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
+    } 
+    else generaerror(ERROR_OPERANDO);
 
     actualizaCC(VM, resultado);
-  //  printf("VALOR DE CC = %d \n",VM->reg[CC]);
-
-    switch (instruc.sizeA) {
-        case 1:
-            VM->reg[codReg] = resultado;
-            break;
-        case 3:
-            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
-            break;
-    }
 }
 
+
 void SHR(TVM *VM, Instruccion instruc) {
-    int valorA = 0, desplazamientos = 0, resultado = 0, codReg;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    desplazamientos = guardaB(VM, instruc);
+    guardaB(VM, instruc, &valorB); // cantidad de bits a desplazar
 
-    switch (instruc.sizeA) {
-        case 1:
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato 
-        case 3:
-            valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
-    }
-
-    resultado = (unsigned int)valorA >> desplazamientos; // corrimiento lógico
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+        resultado = (unsigned int)valorA >> valorB;
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
+    } 
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = (unsigned int)valorA >> valorB;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
+    } 
+    else generaerror(ERROR_OPERANDO);
 
     actualizaCC(VM, resultado);
-  //  printf("VALOR DE CC = %d \n",VM->reg[CC]);
-
-    switch (instruc.sizeA) {
-        case 1:
-            VM->reg[codReg] = resultado;
-            break;
-        case 3:
-            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
-            break;
-    }
 }
 
 void SAR(TVM *VM, Instruccion instruc) {
-    int valorA = 0, desplazamientos = 0, resultado = 0, codReg;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    desplazamientos = guardaB(VM, instruc);
+    guardaB(VM, instruc, &valorB); // cantidad de bits a desplazar
 
-    //valor a desplazar
-    switch (instruc.sizeA) {
-        case 1:
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3:
-            valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+        resultado = valorA >> valorB; // en C, el >> ya es aritmético para signed int
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
-
-    resultado = valorA >> desplazamientos; // corrimiento aritmético (mantiene signo en int)
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = valorA >> valorB;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
+    }
+    else generaerror(ERROR_OPERANDO);
 
     actualizaCC(VM, resultado);
-  //  printf("VALOR DE CC = %d \n",VM->reg[CC]);
-
-    switch (instruc.sizeA) {
-        case 1:
-            VM->reg[codReg] = resultado;
-            break;
-        case 3:
-            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
-            break;
-    }
 }
 
 void AND(TVM *VM, Instruccion instruc) {
-    int codReg, resultado, valorA, valorB;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    // 1. Leer operandos
-    valorB = guardaB(VM, instruc);
+    guardaB(VM, instruc, &valorB);
 
-    // --- Obtener OpA ---
-    switch (instruc.sizeA) {
-        case 1: // registro
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3: // memoria
-            valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+        resultado = valorA & valorB;
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
-
-    // 2. Ejecutar AND
-    resultado = valorA & valorB;
-
-    // 3. Guardar resultado en OpA
-    switch (instruc.sizeA) {
-        case 1: // registro
-            VM->reg[codReg] = resultado;
-            break;
-
-        case 3: // memoria
-            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
-            break;
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = valorA & valorB;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
     }
+    else generaerror(ERROR_OPERANDO);
 
-    // 4. Actualizar CC
     actualizaCC(VM, resultado);
-  // printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 
 void OR(TVM *VM, Instruccion instruc) {
-    int codReg, resultado, valorA, valorB;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    // 1. Leer operandos
-    valorB = guardaB(VM, instruc);
+    guardaB(VM, instruc, &valorB);
 
-    // --- Obtener OpA ---
-    switch (instruc.sizeA) {
-        case 1: // registro
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3: // memoria
-            valorA = leerMemoria(VM,  VM->reg[OP1], 4);
-            break;
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+        resultado = valorA | valorB;
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
-
-    // 2. Ejecutar OR
-    resultado = valorA | valorB;
-
-    // 3. Guardar resultado en OpA
-    switch (instruc.sizeA) {
-        case 1: // registro
-            VM->reg[codReg] = resultado;
-            break;
-
-        case 3: // memoria
-            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
-            break;
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = valorA | valorB;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
     }
+    else generaerror(ERROR_OPERANDO);
 
-    // 4. Actualizar CC
     actualizaCC(VM, resultado);
- //  printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
 
 void XOR(TVM *VM, Instruccion instruc) {
-    int codReg, resultado, valorA, valorB;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0, valorB = 0, resultado = 0;
 
-    // 1. Leer operandos
-    valorB = guardaB(VM, instruc);
+    guardaB(VM, instruc, &valorB);
 
-    // --- Obtener OpA ---
-    switch (instruc.sizeA) {
-        case 1: // registro
-            DefinoRegistro(&codReg, instruc.valorA);
-            valorA = VM->reg[codReg];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3: // memoria
-            valorA = leerMemoria(VM,  VM->reg[OP1], 4);
-            break;
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+        resultado = valorA ^ valorB;
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
-
-    // 2. Ejecutar XOR
-    resultado = valorA ^ valorB;
-
-    // 3. Guardar resultado en OpA
-    switch (instruc.sizeA) {
-        case 1: // registro
-            VM->reg[codReg] = resultado;
-            break;
-
-        case 3: // memoria
-            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
-            break;
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = valorA ^ valorB;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
     }
+    else generaerror(ERROR_OPERANDO);
 
-    // 4. Actualizar CC
     actualizaCC(VM, resultado);
-  // printf("VALOR DE CC = %d \n",VM->reg[CC]);
 }
+
 
 void SWAP(TVM *VM, Instruccion instruc) {
-    int codRegA, codRegB;
-    int valorA = 0, valorB = 0, temp;
+    unsigned char SecA, SecB;
+    int CodOpA, CodOpB;
+    int valorA = 0, valorB = 0;
 
-    // --- Obtener OpA ---
-    switch (instruc.sizeA) {
-        case 1: // registro
-            DefinoRegistro(&codRegA, instruc.valorA);
-            valorA = VM->reg[codRegA];
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
-        case 3: // memoria
-            valorA = leerMemoria(VM, VM->reg[OP1], 4);
-            break;
-    }
-
-    // --- Obtener OpB con guardaB ---
-    valorB = guardaB(VM, instruc);
-
-    // --- Intercambiar ---
-    temp   = valorA;
-    valorA = valorB;
-    valorB = temp;
-
-    // --- Guardar OpA ---
-    switch (instruc.sizeA) {
-        case 1: VM->reg[codRegA] = valorA; break;
-        case 3: escribeMemoria(VM,VM->reg[OP1], valorA, 4); break;
-    }
-
-    // --- Guardar OpB ---
-    switch (instruc.sizeB) {
-        case 1: // registro
-            DefinoRegistro(&codRegB, instruc.valorB);
-            VM->reg[codRegB] = valorB;
-            break;
-
-        case 3: // memoria
-            escribeMemoria(VM,VM->reg[OP2], valorB, 4);
-            break;
-
-        //case 2:  inmediato
-            // no se puede swap con inmediato, hay que generar error, 
-            // pero como no se pide, nose si hacerlo.
-        //    return;
-    }
-
-    // --- Actualizar CC ---
-    actualizaCC(VM, valorA);
-   //printf("VALOR DE CC = %d \n",VM->reg[CC]);
-}
-
-   void LDH(TVM *VM, Instruccion instruc) {
-    int valorB, resultado;
-
-    // --- OpB ---
-    valorB = guardaB(VM, instruc);
-
+    // Leer A y B
     if (instruc.sizeA == 1) {
-        // Operando A es registro
-        int codReg;
-        DefinoRegistro(&codReg, instruc.valorA);
-
-        // --- LDH: reemplaza los 16 bits altos ---
-        resultado = (VM->reg[codReg] & 0x0000FFFF) | ((valorB & 0xFFFF) << 16);
-
-        // --- Guardar ---
-        VM->reg[codReg] = resultado;
-    } else if (instruc.sizeA == 3) {
-        // Operando A es memoria
-        int valorActual = leerMemoria(VM, instruc.valorA, 4); // Leer 32 bits actuales
-        resultado = (valorActual & 0x0000FFFF) | ((valorB & 0xFFFF) << 16);
-
-        // --- Escribir de vuelta ---
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
-    } else {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+    } 
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+    } 
+    else {
         generaerror(ERROR_OPERANDO);
         return;
     }
 
-    // --- Actualizar banderas ---
-    actualizaCC(VM, resultado);
- //   printf("VALOR DE CC = %d \n", VM->reg[CC]);
+    guardaB(VM, instruc, &valorB);
+
+    // Escribir intercambiados
+    if (instruc.sizeA == 1) escribirSectorRegistro(VM, CodOpA, SecA, valorB);
+    else if (instruc.sizeA == 3) escribeMemoria(VM, instruc.valorA, valorB, 4);
+
+    if (instruc.sizeB == 1) {
+        DefinoRegistro(&CodOpB, &SecB, instruc.valorB);
+        escribirSectorRegistro(VM, CodOpB, SecB, valorA);
+    } 
+    else if (instruc.sizeB == 3) {
+        escribeMemoria(VM, instruc.valorB, valorA, 4);
+    }
 }
+
+void LDH(TVM *VM, Instruccion instruc) {
+    unsigned char SecA;
+    int CodOpA;
+    int valorB = 0, valorA = 0, resultado = 0;
+
+    guardaB(VM, instruc, &valorB);
+
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+        resultado = (valorA & 0x0000FFFF) | ((valorB & 0xFFFF) << 16);
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
+    } 
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = (valorA & 0x0000FFFF) | ((valorB & 0xFFFF) << 16);
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
+    } 
+    else generaerror(ERROR_OPERANDO);
+}
+
 
 void LDL(TVM *VM, Instruccion instruc) {
-    int valorB, resultado;
+    unsigned char SecA;
+    int CodOpA;
+    int valorB = 0, valorA = 0, resultado = 0;
 
-    // --- OpB ---
-    valorB = guardaB(VM, instruc);
+    guardaB(VM, instruc, &valorB);
 
     if (instruc.sizeA == 1) {
-        // Operando A es registro
-        int codReg;
-        DefinoRegistro(&codReg, instruc.valorA);
-
-        // --- LDL: reemplaza los 16 bits bajos ---
-        resultado = (VM->reg[codReg] & 0xFFFF0000) | (valorB & 0xFFFF);
-
-        // --- Guardar ---
-        VM->reg[codReg] = resultado;
-    } else if (instruc.sizeA == 3) {
-        // Operando A es memoria
-        int valorActual = leerMemoria(VM, instruc.valorA, 4); // Leer 32 bits actuales
-        resultado = (valorActual & 0xFFFF0000) | (valorB & 0xFFFF);
-
-        // --- Escribir de vuelta ---
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+        resultado = (valorA & 0xFFFF0000) | (valorB & 0xFFFF);
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
+    } 
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = (valorA & 0xFFFF0000) | (valorB & 0xFFFF);
         escribeMemoria(VM, instruc.valorA, resultado, 4);
-    } else {
-        generaerror(ERROR_OPERANDO);
-        return;
-    }
-
-    // --- Actualizar banderas ---
-    actualizaCC(VM, resultado);
- //   printf("VALOR DE CC = %d \n", VM->reg[CC]);
+    } 
+    else generaerror(ERROR_OPERANDO);
 }
 
 
@@ -1055,27 +905,24 @@ int random32() {
 }
 
 void RND(TVM *VM, Instruccion instruc) {
-    int codReg, resultado;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0;
+    int resultado;
 
-    // 1. Generar número aleatorio (32 bits)
-    resultado = random32();
+    resultado = random32();  // genera número aleatorio de 32 bits
 
-    // 2. Guardar en destino (OpA)
-    switch (instruc.sizeA) {
-        case 1: // Registro
-            DefinoRegistro(&codReg, instruc.valorA);
-            VM->reg[codReg] = resultado;
-            break;
-
-        case 3: // Memoria
-            escribeMemoria(VM,VM->reg[OP1],resultado, 4);
-            break;
-
-        case 2: // Inmediato no permitido
-            generaerror(ERROR_OPERANDO); // Error: RND destino inmediato
-            break;
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);  // mantiene consistencia
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
+    else if (instruc.sizeA == 3) {
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
+    }
+    else generaerror(ERROR_OPERANDO);
 }
+
 
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
     int codReg, offset;
@@ -1155,30 +1002,26 @@ void JNP(TVM *VM, Instruccion instruc) {
 }
 
 void NOT(TVM *VM, Instruccion instruc) {
-    int codReg, valor, resultado;
+    unsigned char SecA;
+    int CodOpA;
+    int valorA = 0, resultado = 0;
 
-    switch (instruc.sizeA) {
-        case 1: // Registro
-            DefinoRegistro(&codReg, instruc.valorA);
-            valor = VM->reg[codReg];
-            resultado = ~valor;
-            VM->reg[codReg] = resultado;
-            break;
-
-        case 3: // Memoria
-            valor = leerMemoria(VM,  VM->reg[OP1], 4);
-            resultado = ~valor;
-            escribeMemoria(VM,VM->reg[OP1], resultado, 4);
-            break;
-        case 2:
-            generaerror(ERROR_OPERANDO);
-            break; //no puede ser inmediato
+    if (instruc.sizeA == 1) {
+        DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
+        LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
+        resultado = ~valorA;
+        escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
+    else if (instruc.sizeA == 3) {
+        valorA = leerMemoria(VM, instruc.valorA, 4);
+        resultado = ~valorA;
+        escribeMemoria(VM, instruc.valorA, resultado, 4);
+    }
+    else generaerror(ERROR_OPERANDO);
 
-    // Actualizar banderas
-    actualizaCC(VM,resultado);
-   // printf("VALOR DE CC = %d \n",VM->reg[CC]);
+    actualizaCC(VM, resultado);
 }
+
 
 void STOP(TVM * VM,Instruccion instruc) {
     exit (0);
