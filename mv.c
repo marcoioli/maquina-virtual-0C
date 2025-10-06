@@ -351,6 +351,11 @@ void leeIP(TVM *VM) {
 
             int ip_anterior = VM->reg[IP];
 
+             // actualiza ip
+            if (VM->reg[IP] == ip_anterior ) {
+            VM->reg[IP] += 1 + instruc.sizeA + instruc.sizeB;
+            }
+              
             // hace la funcion
             if (!((codOp <= 0x08) || (codOp >= 0x10 && codOp<= 0x1F))) {
                printf("[ERROR] Código de operación inválido: %02X\n", codOp);
@@ -360,12 +365,7 @@ void leeIP(TVM *VM) {
                 Funciones[codOp](VM, instruc);
             } else {
         //        printf("[WARNING] Instrucción %02X no implementada\n", codOp);
-            }
-
-            // actualiza ip
-            if (VM->reg[IP] == ip_anterior ) {
-            VM->reg[IP] += 1 + instruc.sizeA + instruc.sizeB;
-            }   
+            } 
             // Condición de parada por STOP
             if (VM->reg[IP] == -1) {
       //          printf("[STOP] Ejecución finalizada por instrucción STOP\n");
