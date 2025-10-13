@@ -116,12 +116,64 @@ void generaerror(int codigo) {
     exit(EXIT_FAILURE); // Aborta la ejecución
 }
 
-void iniciaRegs(TVM * VM,int tam) {
-    VM->reg[CS] = 0x00000000;
-    VM->reg[DS] = (1<<16) | 0; //tamanio??
-    VM->reg[IP] = VM->reg[CS];
-    VM->reg[AC] = 0;
+void iniciaRegs(TVM *VM, unsigned short entry_offset) {
+    // inicia ip
+    if (VM->reg[CS] == 0xFFFFFFFF) {
+        printf("Error: no hay Code Segment para iniciar IP.\n");
+        return;
+    }
+
+    //16 bits mas significativos, offset cs, y 16 menos con el entry point
+    int csIndex = (int)(VM->reg[CS] >> 16);
+    VM->reg[IP] = ((unsigned int)csIndex << 16) | entry_offset;
+
+    // si hay stack segment, hay q inicializar la pila
+    if (VM->reg[SS] == 0xFFFFFFFF) 
+     return;
+
+    // valores por defecto (según enunciado MV2)
+    unsigned int retMain = 0xFFFFFFFF;  // dirección de retorno fuera de CS
+    unsigned int argc    = 0;            // cantidad de parámetros
+    unsigned int argvPtr = 0xFFFFFFFF;  // puntero a arreglo de parámetros
+
+    // Cuando tengas implementado PUSH, esto ya va a funcionar igual que en ejecución:
+   // push(VM, retMain);
+   // push(VM, argc);
+   // push(VM, argvPtr);
 }
+
+void cargaParametros(TVM *VM, int cant, char *params[]) {
+    int i, j;
+    int offset = 0;
+    int inicioString[50]; // hasta 50 parámetros, podés aumentar si querés
+
+    // === 1. Copiar los strings uno detrás del otro 
+    for (i = 0; i < cant; i++) {
+        inicioString[i] = offset; // guardo posición inicial del string i
+        j = 0;
+        while (params[i][j] != '\0') {
+            VM->memory[offset++] = params[i][j];
+            j++;
+        }
+        VM->memory[offset++] = '\0'; // terminator
+    }
+
+    // guarda los punteros de cada string
+    for (i = 0; i < cant; i++) {
+        unsigned int puntero = (0 << 16) | inicioString[i]; // segmento PS (0)
+        VM->memory[offset++] = (puntero >> 24) & 0xFF;
+        VM->memory[offset++] = (puntero >> 16) & 0xFF;
+        VM->memory[offset++] = (puntero >> 8)  & 0xFF;
+        VM->memory[offset++] = (puntero)       & 0xFF;
+    }
+
+    //guardar tamanio del param segment
+    VM->param_size = offset;
+
+    //los numeros se guardan como strings??? 
+
+}
+
 
 void cargaSegmentos(TVM *VM, THeader header) {
     int base = 0;
@@ -211,7 +263,7 @@ void cargaSegmentos(TVM *VM, THeader header) {
     }
 }
 
-void leoArch(TVM * VM, char nomarch[]) {
+void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
     FILE * archb;
     THeader header;
     char t1,t2;
@@ -286,6 +338,11 @@ void leoArch(TVM * VM, char nomarch[]) {
         if (strcmp(id, "VMX25") == 0) {
             // Versión extendida: ahora pasamos los tamaños leídos al inicializador
             cargaSegmentos(VM, header.tam);
+            if (cantParams> 0) {
+                cargaParametros(VM, cantParams, parametros); 
+            }
+            else
+             VM->param_size=0;
             iniciaRegs(VM, header.tam);
 
             // === Carga del código a memoria ===
@@ -296,7 +353,7 @@ void leoArch(TVM * VM, char nomarch[]) {
             // === Si existe Const Segment
             if (header.const_size > 0) {
                 fread(&(VM->memory[i]), 1, header.const_size, archb);
-                i += header.const_size;
+                //esto no se si va i += header.const_size;
             }
 
         printf("\n");
@@ -443,10 +500,6 @@ void leeIP(TVM *VM) {
             unsigned char rawInstr = VM->memory[dirFisica];
             ComponentesInstruccion(VM, dirFisica, &instruc, &cantOp, &codOp);
 
-        //    printf("[FETCH] IP=%08X | DirFisica=%04X | rawInstr=%02X | codOp=%02X | sizeA=%d sizeB=%d cantOp=%d AC=%d\n",
-         //          VM->reg[IP], dirFisica, rawInstr, codOp, instruc.sizeA, instruc.sizeB, cantOp,VM->reg[AC]);
-
-            // lee operandos
             if (cantOp > 0) {
                 SeteoValorOp(VM, dirFisica, &instruc);
             } else {
@@ -458,13 +511,6 @@ void leeIP(TVM *VM) {
             VM->reg[OPC] = codOp;
             VM->reg[OP1] = (instruc.sizeA << 24) | (instruc.valorA & 0x00FFFFFF);
             VM->reg[OP2] = (instruc.sizeB << 24) | (instruc.valorB & 0x00FFFFFF);
-
-      //      printf("OPC = %08X \n",VM->reg[OPC]);
-     //       printf("OP1 = %08X \n",VM->reg[OP1]);
-      //      printf("OP2 = %08X \n",VM->reg[OP2]);
-
-
-      //     printf("[DEBUG] codOp=%02X (%d)\n", codOp, codOp);
 
             int ip_anterior = VM->reg[IP];
 
@@ -488,12 +534,6 @@ void leeIP(TVM *VM) {
       //          printf("[STOP] Ejecución finalizada por instrucción STOP\n");
                 ejecutando = 0;
             }
-
-            // Debug de registros después de ejecutar
-       //  printf("[DEBUG] Regs: EAX=%08X EBX=%08X ECX=%08X EDX=%08X EFX=%08X AC=%08X CC=%08X IP=%08X\n",
-       //            VM->reg[EAX], VM->reg[EBX], VM->reg[ECX], VM->reg[EDX],VM->reg[EFX],
-       //           VM->reg[AC], VM->reg[CC], VM->reg[IP]);
-       //  printf("\n");
         }
     }
 }

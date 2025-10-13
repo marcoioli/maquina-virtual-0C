@@ -9,9 +9,36 @@ int main(int argc, char *argv[]) {
     char VecFunciones[CANTFUNC][5]; //5 Es la cantidad de caracteres que tiene como maximo el nombre de la funcion.
     char VecRegistros[CANTREG][4];
     char nomarch[50];
+    THeader header;
+    int i;
+
+    
+    // 1. Buscar si se pasó "-p"
+    int pos_p = -1;
+    i = 1;
+    while (i < argc && pos_p == -1) {
+        if (strcmp(argv[i], "-p") == 0) {
+            pos_p = i;
+        }
+       i++;
+    }
+
+    // 2. Calcular cantidad de parámetros reales
+    int cantParams = 0;
+    if (pos_p != -1) {
+        cantParams = argc - (pos_p + 1);
+    }
+
+    // 3. Si hay parámetros, crear el Param Segment
+    if (cantParams > 0) {
+        cargaParametros(&VM, cantParams, &argv[pos_p + 1]);
+    } else {
+        VM.param_size = 0;
+    }
 
     strcpy(nomarch,argv[1]); //si ejecutas main.exe prueba.vmx se guarda prueba.vmc en nomarch
-    leoArch(&VM,nomarch);
+    leoArch(&VM, argv[1], cantParams, &argv[pos_p + 1]);
+
 
     inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
@@ -25,14 +52,6 @@ int main(int argc, char *argv[]) {
     printf("Comienza a leer IP \n");
     leeIP(&VM);
  
-    
-    printf("EAX = %d (0x%08X)\n", VM.reg[EAX], VM.reg[EAX]);
-    printf("EBX = %d (0x%08X)\n", VM.reg[EBX], VM.reg[EBX]);
-    printf("ECX = %d (0x%08X)\n", VM.reg[ECX], VM.reg[ECX]);
-    printf("EDX = %d (0x%08X)\n", VM.reg[EDX], VM.reg[EDX]);
-    printf("AC  = %d (0x%08X)\n", VM.reg[AC], VM.reg[AC]);
-    printf("CC  = %d (0x%08X)\n", VM.reg[CC], VM.reg[CC]);
-    
 
     return 0;
 }
