@@ -1293,9 +1293,6 @@ void ret(TVM *VM) {
     VM->reg[IP] = dirRet;
 }
 
-
-
-
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
     int codReg, offset;
 
@@ -1310,6 +1307,7 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
             break;
         case 3: // memoria
             offset = leerMemoria(VM, VM->reg[OP1]);
+            //debieria ser offset = leerMemoria(VM, instruc.valorA); ??????
             break;
         default:
             generaerror(ERROR_OPERANDO);
@@ -1317,7 +1315,9 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
     }
 
     // Validar que el offset esté dentro del segmento de código
-    int tamCS = getTam(VM->segmentos[SEG_CS]);
+    int csIndex = (VM->reg[CS] >> 16) & 0xFFFF; 
+    int tamCS   = VM->segmentos[csIndex].tam;
+
     if (offset < 0 || offset >= tamCS) {
         generaerror(ERROR_SEGMENTO);
         return -1;
@@ -1328,48 +1328,48 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
 
 void JMP(TVM *VM, Instruccion instruc) {
     int destino = resolverSaltoSeguro(VM, instruc);
-    if (destino != -1) VM->reg[IP] = destino;
+    if (destino != -1) VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (destino & 0xFFFF);
 }
 
 void JZ(TVM *VM, Instruccion instruc) {
     if (VM->reg[CC] & 0x40000000) { // Z=1 (bit 30)
         int destino = resolverSaltoSeguro(VM, instruc);
-        if (destino != -1) VM->reg[IP] = destino;
+        if (destino != -1) VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (destino & 0xFFFF);
     }
 }
 
 void JNZ(TVM *VM, Instruccion instruc) {
     if (!(VM->reg[CC] & 0x40000000)) { //pregunta por el primer bit de cc
         int destino = resolverSaltoSeguro(VM, instruc);
-        if (destino != -1) VM->reg[IP] = destino;
+        if (destino != -1) VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (destino & 0xFFFF);
     }
 }
 
 void JN(TVM *VM, Instruccion instruc) {
     if (VM->reg[CC] & 0x80000000) { // N=1 (bit 31)
         int destino = resolverSaltoSeguro(VM, instruc);
-        if (destino != -1) VM->reg[IP] = destino;
+        if (destino != -1) VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (destino & 0xFFFF);
     }
 }
 
 void JNN(TVM *VM, Instruccion instruc) {
     if (!(VM->reg[CC] & 0x80000000)) {
         int destino = resolverSaltoSeguro(VM, instruc);
-        if (destino != -1) VM->reg[IP] = destino;
+        if (destino != -1) VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (destino & 0xFFFF);
     }
 }
 
 void JP(TVM *VM, Instruccion instruc) {
     if (!(VM->reg[CC] & 0x80000000) && !(VM->reg[CC] & 0x40000000)) {
         int destino = resolverSaltoSeguro(VM, instruc);
-        if (destino != -1) VM->reg[IP] = destino;
+        if (destino != -1) VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (destino & 0xFFFF);
     }
 }
 
 void JNP(TVM *VM, Instruccion instruc) {
     if ((VM->reg[CC] & 0x80000000) || (VM->reg[CC] & 0x40000000)) {
         int destino = resolverSaltoSeguro(VM, instruc);
-        if (destino != -1) VM->reg[IP] = destino;
+        if (destino != -1) VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (destino & 0xFFFF);
     }
 }
 
