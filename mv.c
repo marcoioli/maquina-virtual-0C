@@ -452,24 +452,37 @@ int getTam(int valor) {
   return (valor & 0x0000FFFF);
 }
 
-int getDirfisica(TVM *VM, int offset,int segmento, int size) {
+int getDirfisica(TVM *VM, int offset, int segmento, int size) {
+    int base, tam, dirFisica;
 
-    int base,tam;
-
-    if (segmento > SEG_TABLE) { // ya no es fijo crear variable segm_count al leer archivo
+    // Validar índice de segmento
+    if (segmento < 0 || segmento > SEG_TABLE) {
         generaerror(ERROR_SEGMENTO);
+        dirFis = -1;
     }
     else {
-        base = (VM->segmentos[segmento] & 0xFFFF0000) >> 16; //base del segmento 
-        tam = (VM->segmentos[segmento]&0x0000FFFF);
-        int dirFisica = base+offset;
-        if (dirFisica >= base && (dirFisica + size - 1) < (base + tam )) //+ inicial
-            return dirFisica;
+        if (tam <= 0) {
+        generaerror(ERROR_SEGMENTO);
+        dirFis = -1;
+        }
         else {
+            if (offset < 0 || (offset + size) > tam) {
             generaerror(ERROR_SEGMENTO);
+            dirFis = -1;
+            } 
+            else {
+                base = VM->segmentos[segmento].base;
+                tam  = VM->segmentos[segmento].tam;
+                dirFisica = base + offset;
+                
+            }
         }
     }
+
+    return dirFis;
+
 }
+
 
 void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp){
    unsigned char Instruccion = VM->memory[DirFisica];
@@ -669,14 +682,14 @@ void escribeMemoria(TVM *VM, int OP, int valor) {
         offop |= 0xFFFF0000;
 
     // Obtener selector de segmento y offset actual del registro base
-    uint32_t regVal = VM->reg[regact];
+    int regVal = VM->reg[regact];
     segIndex = (regVal >> 16) & 0xFFFF;
     offreg   = regVal & 0xFFFF;
 
     // Validar existencia del segmento
-    if (segIndex == 0xFFFF || segIndex >= SEG_TABLE) {
-        generaerror(ERROR_SEGMENTO);
-        return;
+    if (segIndex < 0 || segIndex >= SEG_TABLE || VM->segmentos[segIndex].base == -1) {
+     generaerror(ERROR_SEGMENTO);
+    return;
     }
 
     // No se permite escribir en PS o KS????
@@ -688,10 +701,12 @@ void escribeMemoria(TVM *VM, int OP, int valor) {
     }
 
     // Calcular offset efectivo
-    if (offreg == 0)
-        offset = offop;
-    else
-        offset = offreg + offop;
+    //offset = offreg + offop; capaz es solo asi siempre
+
+    // if (offreg == 0)
+    //     offset = offop;
+    // else
+    offset = offreg + offop;
 
     // Cargar LAR
     VM->reg[LAR] = (segIndex << 16) | (offset & 0xFFFF);
@@ -722,8 +737,6 @@ int leerMemoria(TVM *VM, int OP) {
 
     size = 4 - sizeBits; // 00=4 bytes, 01=2 bytes, 10=1 byte
     
-
-
     // Extraer código de registro base (bits 24–28)
     regact = (OP >> 24) & 0x1F;
 
@@ -737,17 +750,13 @@ int leerMemoria(TVM *VM, int OP) {
     segIndex = (regVal >> 16) & 0xFFFF;
     offreg   = regVal & 0xFFFF;
 
-    //  Validar existencia del segmento
-    if (segIndex == 0xFFFF || segIndex >= SEG_TABLE) {
-        generaerror(ERROR_SEGMENTO);
-        return 0;
+    if (segIndex < 0 || segIndex >= SEG_TABLE || VM->segmentos[segIndex].base == -1) {
+     generaerror(ERROR_SEGMENTO);
+    return 0;
     }
 
-    // Calcular offset efectivo
-    if (offreg == 0)
-        offset = offop;
-    else
-        offset = offreg + offop;
+
+    offset = offreg + offop;
 
     // Cargar LAR
     VM->reg[LAR] = (segIndex << 16) | (offset & 0xFFFF);
@@ -1231,40 +1240,55 @@ void PUSH(TVM *VM, unsigned int valor) {
 
 
 
-void POP(TVM *VM,  int *valor) {
-    int ssIndex = (VM->reg[SS] >> 16);
-    int sp = VM->reg[SP] & 0xFFFF;
-    int baseSS = VM->segmentos[ssIndex].base;
+void POP(TVM *VM, unsigned int *valor) {
 
-    if (sp >= VM->segmentos[ssIndex].tam) {
-        printf("Error: STACK UNDERFLOW\n");
-        return;
+    if (VM->reg[SS] == 0xFFFFFFFF) {
+        printf("Error: no existe Stack Segment.\n");
+        exit(1);
     }
 
+    int  ssIndex = (VM->reg[SS] >> 16);
+    int sp = VM->reg[SP] & 0xFFFF;
+    int baseSS = VM->segmentos[ssIndex].base;
+    int tamSS  = VM->segmentos[ssIndex].tam;
+s
+    // (El tope está en la dirección que apunta SP)
     int dirFis = baseSS + sp;
-    int val = 0;
 
-    // Big endian: leer MSB primero
-    val |= VM->memory[dirFis + 0] << 24;
-    val |= VM->memory[dirFis + 1] << 16;
-    val |= VM->memory[dirFis + 2] << 8;
-    val |= VM->memory[dirFis + 3];
+    // hay espacio??????
+    if ((sp + 4) > tamSS) {
+        printf("STACK UNDERFLOW\n");
+        exit(1);
+    }
 
+    // reconstruye el valor
+     int val = 0;
+    val |= VM->memory[dirFis + 3] << 24;
+    val |= VM->memory[dirFis + 2] << 16;
+    val |= VM->memory[dirFis + 1] << 8;
+    val |= VM->memory[dirFis + 0];
+
+    // 4️⃣ Asignar valor extraído (ajuste al tamaño del operando)
+    //devuelve 4 bytes
     *valor = val;
 
-    // La pila crece hacia abajo, así que al hacer POP se sube el puntero
+    // 5️⃣ Incrementar SP en 4
     sp += 4;
     VM->reg[SP] = (ssIndex << 16) | sp;
 }
 
+
 void CALL(TVM *VM, unsigned int destino) {
-    int ipActual = VM->reg[IP];
-    push(VM, ipActual); // Guardamos RET
-    VM->reg[IP] = destino; // Saltamos a la subrutina
+    push(VM, VM->reg[IP]);
+
+    // 2️⃣ Modificar solo los 2 bytes menos significativos del IP con el destino
+    unsigned int ipActual = VM->reg[IP];
+    ipActual = (ipActual & 0xFFFF0000) | (destino & 0xFFFF); //4 bytes de IP, pone los 2 bytes el valor del operando
+    VM->reg[IP] = ipActual;
 }
 
 void ret(TVM *VM) {
-    int int dirRet;
+    int dirRet;
     pop(VM, &dirRet);
     VM->reg[IP] = dirRet;
 }
