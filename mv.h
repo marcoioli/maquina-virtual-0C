@@ -7,7 +7,7 @@
 #define MASK_CC_N 0x80000000
 #define MASK_CC_Z 0x40000000
 #define TAMID 5
-#define CANTSEGMENTOS 8
+
 
 #define SEG_CS 0
 #define SEG_DS 1
@@ -42,6 +42,7 @@
 #define ERROR_DIVISION_POR_CERO 2
 #define ERROR_SEGMENTO 3
 #define ERROR_OPERANDO 4
+#define ERROR_MEMORIA_INSUFICIENTE 5
 
 
 typedef struct THeader{

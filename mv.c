@@ -125,6 +125,9 @@ void generaerror(int codigo) {
         case ERROR_OPERANDO:
             printf("[ERROR] Operando inválido\n");
             break;
+        case ERROR_MEMORIA_INSUFICIENTE:
+            printf("[ERROR] Memoria insuficiente para alojar todos los segmentos\n");
+            break;
     }
     exit(EXIT_FAILURE); // Aborta la ejecución
 }
@@ -264,9 +267,8 @@ void cargaSegmentos(TVM *VM, THeader header) {
     }
 
     // === Verificación de memoria total ===
-    if (base > VM->MEM_SIZE) {
-        printf("Error: Memoria insuficiente para alojar todos los segmentos.\n");
-        exit(1);
+    if (base > MEMORY_SIZE) {
+        generaerror(ERROR_MEMORIA_INSUFICIENTE);
     }
 
     // === Debug ===
@@ -454,7 +456,7 @@ int getDirfisica(TVM *VM, int offset,int segmento, int size) {
 
     int base,tam;
 
-    if (segmento > CANTSEGMENTOS) { // ya no es fijo crear variable segm_count al leer archivo
+    if (segmento > SEG_TABLE) { // ya no es fijo crear variable segm_count al leer archivo
         generaerror(ERROR_SEGMENTO);
     }
     else {
@@ -464,9 +466,7 @@ int getDirfisica(TVM *VM, int offset,int segmento, int size) {
         if (dirFisica >= base && (dirFisica + size - 1) < (base + tam )) //+ inicial
             return dirFisica;
         else {
-       //   printf("[ERROR] ACCEDIENDO A DIRECCION MENOR A LA BASE O MAYOR AL TAMANIO \n");
-        //   printf("DIRFISICA %08X, BASE=%08X, TAMANIO= %08X \n",dirFisica, base, tam);
-            return -1;
+            generaerror(ERROR_SEGMENTO);
         }
     }
 }
@@ -624,19 +624,19 @@ void DefinoRegistro(int *codReg, int *sector, int op) {
 void LeerSectorRegistro(int *AuxR,TVM * VM,unsigned char Sec,int CodReg){ 
   int CorroSigno=0;
   if (Sec == 1){
-        *AuxR = VM.reg[CodReg] & 0XFF;
+        *AuxR = VM->reg[CodReg] & 0XFF;
         CorroSigno = 24;
     }
   else if (Sec == 2){
-        *AuxR = (VM.reg[CodReg] & 0XFF00) >> 8;
+        *AuxR = (VM->reg[CodReg] & 0XFF00) >> 8;
         CorroSigno = 16;
     }
   else if (Sec == 3){
-        *AuxR = VM.reg[CodReg] & 0XFFFF;
+        *AuxR = VM->reg[CodReg] & 0XFFFF;
         CorroSigno = 16;
     }
   else
-        *AuxR = VM.reg[CodReg];
+        *AuxR = VM->reg[CodReg];
 
   *AuxR = *AuxR << CorroSigno;
   *AuxR = *AuxR >> CorroSigno;
@@ -651,91 +651,125 @@ void escribirSectorRegistro(TVM *VM, int codReg, int sec, int nuevoValor) {
     }
 }
 
-void escribeMemoria(TVM * VM,int OP,int valor, int size) {
-    
-    int regact,csact,offreg,offop,offset;
-    
-    regact = (OP & 0x00FF0000) >> 16; //registro actual recibido a modificar
-    csact = (VM->reg[regact] & 0xFFFF0000) >> 16; //codigo de segmento de op recibido
-    offop = OP & 0x0000FFFF; //offset del op recibido
-    offreg = (VM->reg[regact] & 0x0000FFFF); //offset del registro 
+void escribeMemoria(TVM *VM, int OP, int valor) {
+    int regact, segIndex, offreg, offop, offset, sizeBits;
+    int size; // tamaño de la celda (1, 2 o 4 bytes)
 
-     // Si regact es DS o CS, y offreg==0, acceso directo
-    if ((regact == DS || regact == CS) && offreg == 0) {
-        offset = offop;
-    } else {
-        offset = offreg + offop;
-    }
-    
+    //  Extraer tamaño de celda desde los 2 bits más significativos
+    sizeBits = (OP >> 30) & 0x3;  // bits 31-30
 
-    VM->reg[LAR] = csact << 16 | offset;
+    size = 4 - sizeBits; // 00=4 bytes, 01=2 bytes, 10=1 byte
 
-    // 2. Traducir dirección lógica a física
-    int dirFis = getDirfisica(VM, offset,csact, size); //dir fiscia va a ser base segmento + offset
+    // Extraer código de registro base (bits 24–28)
+    regact = (OP >> 24) & 0x1F;
 
-    //error de segmento
-        if (dirFis == -1) {
+    // Extraer offset de 16 bits
+    offop = OP & 0x0000FFFF;
+    if (offop & 0x8000)  // signo extendido si es negativo
+        offop |= 0xFFFF0000;
+
+    // Obtener selector de segmento y offset actual del registro base
+    uint32_t regVal = VM->reg[regact];
+    segIndex = (regVal >> 16) & 0xFFFF;
+    offreg   = regVal & 0xFFFF;
+
+    // Validar existencia del segmento
+    if (segIndex == 0xFFFF || segIndex >= SEG_TABLE) {
         generaerror(ERROR_SEGMENTO);
-        return; // Retornar valor por defecto
+        return;
     }
-    
-    // 3. Cargar MAR (parte alta: size, parte baja: dirección física)
-    VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
 
-    // 4. Cargar en MBR
+    // No se permite escribir en PS o KS????
+    int ps_index = (VM->reg[PS] >> 16) & 0xFFFF;
+    int ks_index = (VM->reg[KS] >> 16) & 0xFFFF;
+    if (segIndex == ps_index || segIndex == ks_index) {
+        generaerror(ERROR_INSTRUCCION);
+        return;
+    }
+
+    // Calcular offset efectivo
+    if (offreg == 0)
+        offset = offop;
+    else
+        offset = offreg + offop;
+
+    // Cargar LAR
+    VM->reg[LAR] = (segIndex << 16) | (offset & 0xFFFF);
+
+    // Obtener dirección física
+    int dirFis = getDirfisica(VM, offset, segIndex, size);
+    if (dirFis == -1) {
+        generaerror(ERROR_SEGMENTO);
+        return;
+    }
+
+    // Cargar registros de control
+    VM->reg[MAR] = ((size & 0xFFFF) << 16) | (dirFis & 0xFFFF);
     VM->reg[MBR] = valor;
 
-    
-
-
-   // printf("LAR : %08X \n",VM->reg[LAR]);
-   // printf("MAR %08X \n",VM->reg[MAR]);
-  //  printf("MBR %08X \n",VM->reg[MBR]);
-
-    // 5. Escribir en memoria (big-endian: byte más significativo primero)
-    for (int i = 0; i < size; i++) 
+    // Escribir valor en memoria (big-endian)
+    for (int i = 0; i < size; i++)
         VM->memory[dirFis + (size - 1 - i)] = (valor >> (8 * i)) & 0xFF;
 }
 
-int leerMemoria (TVM*VM, int OP,int size) {
+int leerMemoria(TVM *VM, int OP) {
+    int regact, segIndex, offreg, offop, offset, sizeBits;
+    int size;
+    int valor = 0;
+
+    // Extraer tamaño de celda desde los bits 31–30
+    sizeBits = (OP >> 30) & 0x3;
+
+    size = 4 - sizeBits; // 00=4 bytes, 01=2 bytes, 10=1 byte
     
-    int regact,csact,offreg,offop,offset;
 
-    regact = (OP & 0x00FF0000) >> 16; //registro actual recibido a modificar
-    csact = (VM->reg[regact] & 0xFFFF0000) >> 16; //codigo de segmento de op recibido
-    offop = OP & 0x0000FFFF; //offset del op recibido
-    offreg = (VM->reg[regact] & 0x0000FFFF); //offset del registro 
-    offset = offreg + offop;
 
-    if ((regact == DS || regact == CS) && offreg == 0) {
-        offset = offop;
-    } else {
-        offset = offreg + offop;
-    }
+    // Extraer código de registro base (bits 24–28)
+    regact = (OP >> 24) & 0x1F;
 
-    VM->reg[LAR] = csact << 16 | offset;
+    //Extraer offset de 16 bits (bits 0–15)
+    offop = OP & 0x0000FFFF;
+    if (offop & 0x8000)  // signo extendido si es negativo
+        offop |= 0xFFFF0000;
 
-    int dirFis = getDirfisica(VM,offset,csact,size);
+    //  Obtener registro base: selector de segmento + desplazamiento
+    uint32_t regVal = VM->reg[regact];
+    segIndex = (regVal >> 16) & 0xFFFF;
+    offreg   = regVal & 0xFFFF;
 
-     //error de segmento
-        if (dirFis == -1) {
+    //  Validar existencia del segmento
+    if (segIndex == 0xFFFF || segIndex >= SEG_TABLE) {
         generaerror(ERROR_SEGMENTO);
-        return 0; // Retornar valor por defecto
+        return 0;
     }
-    
 
-    VM->reg[MAR] = (size << 16) | (dirFis & 0xFFFF);
+    // Calcular offset efectivo
+    if (offreg == 0)
+        offset = offop;
+    else
+        offset = offreg + offop;
 
-    int valorx = 0;
+    // Cargar LAR
+    VM->reg[LAR] = (segIndex << 16) | (offset & 0xFFFF);
+
+    //  Obtener dirección física
+    int dirFis = getDirfisica(VM, offset, segIndex, size);
+    if (dirFis == -1) {
+        generaerror(ERROR_SEGMENTO);
+        return 0;
+    }
+
+    // Cargar MAR y leer contenido
+    VM->reg[MAR] = ((size & 0xFFFF) << 16) | (dirFis & 0xFFFF);
+    valor = 0;
     for (int i = 0; i < size; i++) {
-        valorx = (valorx << 8) | (VM->memory[dirFis + i] & 0xFF);
+        valor = (valor << 8) | (VM->memory[dirFis + i] & 0xFF);
     }
-    VM->reg[MBR] = valorx;
 
-   // printf("LAR  LECTURA: %08X \n",VM->reg[LAR]);
-   // printf("MAR LECTURA %08X \n",VM->reg[MAR]);
-   // printf("MBR LECTURA %08X \n",VM->reg[MBR]);
-    return valorx;
+    // Cargar MBR
+    VM->reg[MBR] = valor;
+
+    return valor;
 }
 
 
@@ -783,7 +817,7 @@ void MOV(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, valorB);
     }
     else if (instruc.sizeA == 3) {
-        escribeMemoria(VM, instruc.valorA, valorB, 4);
+        escribeMemoria(VM, instruc.valorA, valorB);
     }
     else generaerror(ERROR_OPERANDO);
 }
@@ -805,9 +839,9 @@ void ADD(TVM *VM, Instruccion instruc) {
     }
     else if (instruc.sizeA == 3) { 
         // Memoria
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = valorA + valorB;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
     else generaerror(ERROR_OPERANDO);
 
@@ -828,9 +862,9 @@ void SUB(TVM *VM, Instruccion instruc) {
         EscribirSectorRegistro(VM, SecA, CodOpA, resultado);
     }
     else if (instruc.sizeA == 3) { 
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = valorA - valorB;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
     else generaerror(ERROR_OPERANDO);
 
@@ -849,6 +883,11 @@ void MUL(TVM *VM, Instruccion instruc) {
 
         resultado = valorA * valorB;
         EscribirSectorRegistro(VM, SecA, CodOpA, resultado);
+    } else if (instruc.sizeA == 3) { 
+        // Memoria
+        valorA = leerMemoria(VM, instruc.valorA);
+        resultado = valorA * valorB;
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
     else generaerror(ERROR_OPERANDO);
 
@@ -881,10 +920,10 @@ void DIV(TVM *VM, Instruccion instruc) {
 
     // Caso A = memoria
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = valorA / valorB;
         resto = valorA % valorB;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
 
     // Operando inválido
@@ -908,7 +947,7 @@ void CMP(TVM *VM, Instruccion instruc) {
         LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
     }
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
     }
     else generaerror(ERROR_OPERANDO);
 
@@ -930,9 +969,9 @@ void SHL(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     } 
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = valorA << valorB;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     } 
     else generaerror(ERROR_OPERANDO);
 
@@ -954,9 +993,9 @@ void SHR(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     } 
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = (unsigned int)valorA >> valorB;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     } 
     else generaerror(ERROR_OPERANDO);
 
@@ -976,9 +1015,9 @@ void SAR(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = valorA >> valorB;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
     else generaerror(ERROR_OPERANDO);
 
@@ -999,9 +1038,9 @@ void AND(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = valorA & valorB;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
     else generaerror(ERROR_OPERANDO);
 
@@ -1023,9 +1062,9 @@ void OR(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = valorA | valorB;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
     else generaerror(ERROR_OPERANDO);
 
@@ -1046,9 +1085,9 @@ void XOR(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = valorA ^ valorB;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
     else generaerror(ERROR_OPERANDO);
 
@@ -1067,7 +1106,7 @@ void SWAP(TVM *VM, Instruccion instruc) {
         LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
     } 
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
     } 
     else {
         generaerror(ERROR_OPERANDO);
@@ -1078,14 +1117,14 @@ void SWAP(TVM *VM, Instruccion instruc) {
 
     // Escribir intercambiados
     if (instruc.sizeA == 1) escribirSectorRegistro(VM, CodOpA, SecA, valorB);
-    else if (instruc.sizeA == 3) escribeMemoria(VM, instruc.valorA, valorB, 4);
+    else if (instruc.sizeA == 3) escribeMemoria(VM, instruc.valorA, valorB);
 
     if (instruc.sizeB == 1) {
         DefinoRegistro(&CodOpB, &SecB, instruc.valorB);
         escribirSectorRegistro(VM, CodOpB, SecB, valorA);
     } 
     else if (instruc.sizeB == 3) {
-        escribeMemoria(VM, instruc.valorB, valorA, 4);
+        escribeMemoria(VM, instruc.valorB, valorA);
     }
 }
 
@@ -1103,9 +1142,9 @@ void LDH(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     } 
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = (valorA & 0x0000FFFF) | ((valorB & 0xFFFF) << 16);
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     } 
     else generaerror(ERROR_OPERANDO);
 }
@@ -1125,9 +1164,9 @@ void LDL(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     } 
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = (valorA & 0xFFFF0000) | (valorB & 0xFFFF);
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     } 
     else generaerror(ERROR_OPERANDO);
 }
@@ -1152,7 +1191,7 @@ void RND(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
     else if (instruc.sizeA == 3) {
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
     else generaerror(ERROR_OPERANDO);
 }
@@ -1246,7 +1285,7 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
             offset = VM->reg[codReg];
             break;
         case 3: // memoria
-            offset = leerMemoria(VM, VM->reg[OP1], 4);
+            offset = leerMemoria(VM, VM->reg[OP1]);
             break;
         default:
             generaerror(ERROR_OPERANDO);
@@ -1322,9 +1361,9 @@ void NOT(TVM *VM, Instruccion instruc) {
         escribirSectorRegistro(VM, CodOpA, SecA, resultado);
     }
     else if (instruc.sizeA == 3) {
-        valorA = leerMemoria(VM, instruc.valorA, 4);
+        valorA = leerMemoria(VM, instruc.valorA);
         resultado = ~valorA;
-        escribeMemoria(VM, instruc.valorA, resultado, 4);
+        escribeMemoria(VM, instruc.valorA, resultado);
     }
     else generaerror(ERROR_OPERANDO);
 
@@ -1352,7 +1391,7 @@ void SYS(TVM *VM, Instruccion instruc) {
             break;
         }
         case 3: // memoria
-            servicio = leerMemoria(VM, VM->reg[OP1], 4);
+            servicio = leerMemoria(VM, VM->reg[OP1]);
             break;
     }
 
