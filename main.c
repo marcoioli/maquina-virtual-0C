@@ -13,6 +13,15 @@ int main(int argc, char *argv[]) {
     int i;
 
     
+    //vino el vmi
+    if (argc == 2 && strstr(argv[1], ".vmi")) {
+    // Solo archivo de imagen
+    leoVMI(&VM, argv[1]);  // Carga registros, segmentos y memoria desde la imagen
+    printf("Imagen VMI cargada. Continuando ejecución...\n");
+    leeIP(&VM);
+    return 0;
+    }
+    
     // 1. Buscar si se pasó "-p"
     int pos_p = -1;
     i = 1;

@@ -7,7 +7,13 @@
 
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
     //2 Operandos
-    strcpy(VecFunciones[0x10], "MOV");
+    
+    
+    
+    strcpy(Funciones[0x0B] = "PUSH";);
+    strcpy(Funciones[0x0C] = "POP";);
+    strcpy(Funciones[0xD] = "CALL";);
+    strcpy(Funciones[0x0E] =  "RET";);
     strcpy(VecFunciones[0x11], "ADD");
     strcpy(VecFunciones[0x12], "SUB");
     strcpy(VecFunciones[0x13], "MUL");
@@ -23,6 +29,7 @@ void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
     strcpy(VecFunciones[0x1D], "LDL");
     strcpy(VecFunciones[0x1E], "LDH");
     strcpy(VecFunciones[0x1F], "RND");
+
 
     //1 Operando
     strcpy(VecFunciones[0x00], "SYS");
@@ -78,6 +85,12 @@ void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga
     Funciones[0x06] = JNP;
     Funciones[0x07] = JNN;
     Funciones[0x08] = NOT;   
+
+    Funciones[0x0B] = PUSH;
+    Funciones[0x0C] = POP;
+    Funciones[0x0D] = CALL;
+    Funciones[0x0E] = RET;
+
     
     // Instrucciones con dos operandos 
     Funciones[0x10] = MOV;   // 16 decimal
@@ -116,7 +129,7 @@ void generaerror(int codigo) {
     exit(EXIT_FAILURE); // Aborta la ejecución
 }
 
-void iniciaRegs(TVM *VM, unsigned short entry_offset) {
+void iniciaRegs(TVM *VM, int entry_offset) {
     // inicia ip
     if (VM->reg[CS] == 0xFFFFFFFF) {
         printf("Error: no hay Code Segment para iniciar IP.\n");
@@ -262,6 +275,71 @@ void cargaSegmentos(TVM *VM, THeader header) {
         printf("[%d] base=%04X tam=%04X\n", i, VM->segmentos[i].base, VM->segmentos[i].tam);
     }
 }
+
+void leoVMI(TVM *VM, char nomarch[]) {
+    FILE *archb;
+    char id[6];
+    unsigned char b1, b2;
+    int mem_kib;
+    int i;
+
+    archb = fopen(nomarch, "rb");
+    if (archb == NULL) {
+        printf("No se pudo abrir el archivo .vmi\n");
+        return;
+    }
+
+    // === Header ===
+    fread(id, 1, 5, archb);
+    id[5] = '\0';
+    fread(&b1, 1, 1, archb); // versión
+    fread(&b1, 1, 1, archb);
+    fread(&b2, 1, 1, archb);
+    mem_kib = (b1 << 8) | b2;
+
+    if (strcmp(id, "VMI25") != 0) {
+        printf("Error: archivo .vmi inválido\n");
+        fclose(archb);
+        return;
+    }
+
+    printf("Cargando imagen VMI25 (memoria=%d KiB)\n", mem_kib);
+
+    // Carga los registrso
+    //reconstruye leyendo de a 4 bytes
+
+    for (i = 0; i < 32; i++) {
+        unsigned int val = 0;
+        fread(&b1, 1, 1, archb);
+        val |= (b1 << 24);
+        fread(&b1, 1, 1, archb);
+        val |= (b1 << 16);
+        fread(&b1, 1, 1, archb);
+        val |= (b1 << 8);
+        fread(&b1, 1, 1, archb);
+        val |= b1;
+        VM->reg[i] = val;
+    }
+
+    // Carga la tabla de segmentos
+    for (i = 0; i < 8; i++) {
+        fread(&b1, 1, 1, archb);
+        fread(&b2, 1, 1, archb);
+        VM->segmentos[i].base = (b1 << 8) | b2;
+        fread(&b1, 1, 1, archb);
+        fread(&b2, 1, 1, archb);
+        VM->segmentos[i].tam = (b1 << 8) | b2;
+    }
+
+    // Toda la memoria
+    int totalBytes = mem_kib * 1024;
+    fread(VM->memory, 1, totalBytes, archb);
+
+    fclose(archb);
+
+    printf("Imagen cargada correctamente. Reanudando ejecución...\n");
+}
+
 
 void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
     FILE * archb;
@@ -891,7 +969,6 @@ void SAR(TVM *VM, Instruccion instruc) {
     int valorA = 0, valorB = 0, resultado = 0;
 
     guardaB(VM, instruc, &valorB); // cantidad de bits a desplazar
-
     if (instruc.sizeA == 1) {
         DefinoRegistro(&CodOpA, &SecA, instruc.valorA);
         LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
@@ -1079,6 +1156,81 @@ void RND(TVM *VM, Instruccion instruc) {
     }
     else generaerror(ERROR_OPERANDO);
 }
+
+void PUSH(TVM *VM, unsigned int valor) {
+    if (VM->reg[SS] == 0xFFFFFFFF) {
+        printf("Error: no existe Stack Segment.\n");
+        return;
+    }
+
+    unsigned short ssIndex = (VM->reg[SS] >> 16);
+    unsigned int sp = VM->reg[SP] & 0xFFFF;
+    unsigned int baseSS = VM->segmentos[ssIndex].base;
+
+    // 1️⃣ Decrementar SP en 4
+    sp -= 4;
+
+    // 2️⃣ Chequear overflow: SP < base del segmento
+    if (sp < baseSS) {
+        printf("STACK OVERFLOW\n");
+        exit(1);
+    }
+
+    VM->reg[SP] = (ssIndex << 16) | sp;
+
+    // 3️⃣ 4️⃣ Ya recibimos el valor como parámetro (ya es un entero de 4 bytes)
+
+    // 5️⃣ Almacenar en la pila desde los bytes menos significativos
+    // (LSB primero, MSB al final)
+    unsigned int dirFis = baseSS + sp;
+
+    VM->memory[dirFis + 0] = (valor)       & 0xFF;  // LSB
+    VM->memory[dirFis + 1] = (valor >> 8)  & 0xFF;
+    VM->memory[dirFis + 2] = (valor >> 16) & 0xFF;
+    VM->memory[dirFis + 3] = (valor >> 24) & 0xFF;  // MSB
+}
+
+
+
+void POP(TVM *VM,  int *valor) {
+    int ssIndex = (VM->reg[SS] >> 16);
+    int sp = VM->reg[SP] & 0xFFFF;
+    int baseSS = VM->segmentos[ssIndex].base;
+
+    if (sp >= VM->segmentos[ssIndex].tam) {
+        printf("Error: STACK UNDERFLOW\n");
+        return;
+    }
+
+    int dirFis = baseSS + sp;
+    int val = 0;
+
+    // Big endian: leer MSB primero
+    val |= VM->memory[dirFis + 0] << 24;
+    val |= VM->memory[dirFis + 1] << 16;
+    val |= VM->memory[dirFis + 2] << 8;
+    val |= VM->memory[dirFis + 3];
+
+    *valor = val;
+
+    // La pila crece hacia abajo, así que al hacer POP se sube el puntero
+    sp += 4;
+    VM->reg[SP] = (ssIndex << 16) | sp;
+}
+
+void CALL(TVM *VM, unsigned int destino) {
+    int ipActual = VM->reg[IP];
+    push(VM, ipActual); // Guardamos RET
+    VM->reg[IP] = destino; // Saltamos a la subrutina
+}
+
+void ret(TVM *VM) {
+    int int dirRet;
+    pop(VM, &dirRet);
+    VM->reg[IP] = dirRet;
+}
+
+
 
 
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
@@ -1300,6 +1452,26 @@ void SYS(TVM *VM, Instruccion instruc) {
             printf("\n");
         }
     }
+
+    /*
+    case 0x0F: // SYS F - Breakpoint
+    printf("\n=== Breakpoint alcanzado ===\n");
+    guardarVMI(VM, "imagen.vmi");
+    printf("Imagen guardada. Opciones:\n");
+    printf("[g] continuar | [q] salir | [Enter] paso a paso\n");
+
+    char opcion = getchar();
+    if (opcion == 'q') {
+        printf("Ejecución finalizada por usuario.\n");
+        exit(0);
+    } else if (opcion == 'g') {
+        printf("Continuando ejecución...\n");
+    } else {
+        printf("Ejecutando paso a paso...\n");
+        // (podés agregar un modo debug acá más adelante)
+    }
+    break;
+    */
 }
 
 
@@ -1347,7 +1519,7 @@ void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[C
     unsigned char CodOp;
     int CantOp,baseCS,tamCS;
     Instruccion instruc;
-    unsigned short int PosInicial,PosMemoria,PosFinal;
+    int PosInicial,PosMemoria,PosFinal;
 
    // int contador=0;
 
@@ -1376,6 +1548,63 @@ void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[C
             */
     }
 }
+
+void guardarVMI(TVM *VM, char nombre[]) {
+    FILE *archb;
+    unsigned char b1, b2;
+    int i;
+
+    archb = fopen(nombre, "wb");
+    if (archb == NULL) {
+        printf("No se pudo crear el archivo de imagen .vmi\n");
+        return;
+    }
+
+    printf("Generando imagen %s ...\n", nombre);
+
+    // "VMI25" + version + tamaño de memoria (en KiB)
+    fwrite("VMI25", 1, 5, archb);
+    char version = 1;
+    fwrite(&version, 1, 1, archb);
+    int mem_kib = (int)(VM->MEM_SIZE / 1024);
+    b1 = (mem_kib >> 8) & 0xFF;
+    b2 = (mem_kib) & 0xFF;
+    fwrite(&b1, 1, 1, archb);
+    fwrite(&b2, 1, 1, archb);
+
+    // registros
+    for (i = 0; i < 32; i++) {
+         int val = VM->reg[i];
+        char bytes[4];
+        bytes[0] = (val >> 24) & 0xFF;
+        bytes[1] = (val >> 16) & 0xFF;
+        bytes[2] = (val >> 8) & 0xFF;
+        bytes[3] = (val) & 0xFF;
+        fwrite(bytes, 1, 4, archb);
+    }
+
+    //tabla de segmentos
+    for (i = 0; i < 8; i++) {
+        int base = VM->segmentos[i].base;
+        int tam  = VM->segmentos[i].tam;
+
+        b1 = (base >> 8) & 0xFF;
+        b2 = (base) & 0xFF;
+        fwrite(&b1, 1, 1, archb);
+        fwrite(&b2, 1, 1, archb);
+
+        b1 = (tam >> 8) & 0xFF;
+        b2 = (tam) & 0xFF;
+        fwrite(&b1, 1, 1, archb);
+        fwrite(&b2, 1, 1, archb);
+    }
+
+    // === MEMORIA PRINCIPAL ===
+    fwrite(VM->memory, 1, VM->MEM_SIZE, archb);
+
+    fclose(archb);
+}
+
 
 void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegistros[CANTREG][4],
                          unsigned char CodOp, Instruccion instruc, int PosInicial, int PosFinal) {

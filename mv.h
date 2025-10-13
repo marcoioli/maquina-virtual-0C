@@ -82,9 +82,11 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]);
 
 //funciones del programa
 void declaraFunciones(vFunciones Funciones);
-void iniciaRegs(TVM * VM,int tam);
-void cargaSegmentos(TVM * VM,int tam);
+void iniciaRegs(TVM *VM, int entry_offset)
+void cargaSegmentos(TVM *VM, THeader header)
+void cargaParametros(TVM *VM, int cant, char *params[])
 void leoArch(TVM * VM, char nomarch[]);
+void leoVMI(TVM *VM, char nomarch[]);
 int getBase(int valor);
 int getTam(int valor);
 int getDirfisica(TVM *VM, int offset,int segmento, int size);
@@ -118,6 +120,12 @@ void JNP(TVM *VM, Instruccion instruc);
 void NOT(TVM *VM, Instruccion instruc);
 void SYS(TVM *VM, Instruccion instruc);
 void STOP(TVM * VM,Instruccion instruc);
+void PUS(TVM *VM, unsigned int valor);
+void POP(TVM *VM, unsigned int *valor);
+void CALL(TVM *VM, unsigned int destino);
+void RET(TVM *VM);
+
+
 
 int leer_binario_c2_32();
 void imprimir_binario_32(int valor);
@@ -131,6 +139,8 @@ int leerMemoria(TVM *VM, int dirLogica, int size) ;
 void escribeMemoria(TVM * MV,int dirLogica, int valor, int size);
 void DefinoRegistro(int *CodReg, int Op);
 void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg);
+
+void guardarVMI(TVM *VM, char nombre[]);
 
 void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);
 void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegistros[CANTREG][4], unsigned char CodOp, Instruccion instruc, int PosInicial, int PosFinal);
