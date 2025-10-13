@@ -123,15 +123,92 @@ void iniciaRegs(TVM * VM,int tam) {
     VM->reg[AC] = 0;
 }
 
-void cargaSegmentos(TVM * VM,int tam) {
-    VM->segmentos[SEG_CS] = (0 << 16) | tam; 
-    /*aca me conviene un vector con cs yaads, cargando parte alta y parte baja
-    o un vector de registros (base y tamanio) y en cada uno guardo el valor
-    */
-    VM->segmentos[SEG_DS] = (tam << 16) | (MEMORY_SIZE - tam); //los primeros 2 bytes son la base y los otros dos el tam
+void cargaSegmentos(TVM *VM, THeader header) {
+    int base = 0;
+    int indice = 0;  // índice dentro de la tabla de descriptores
 
+    // Limpio la tabla de segmentos
+    for (int i = 0; i < 8; i++) {
+        VM->segmentos[i].base = 0;
+        VM->segmentos[i].tam = 0;
+    }
 
+    // === PARAM SEGMENT (si existe, según parámetros) ===
+    if (VM->param_size > 0) { // si cargaste parámetros con -p
+        VM->segmentos[indice].base = base;
+        VM->segmentos[indice].tam = VM->param_size;
+        VM->reg[PS] = (indice << 16) | 0x0000;
+        base += VM->param_size;
+        indice++;
+    } else {
+        VM->reg[PS] = 0xFFFFFFFF;
+    }
 
+    // === CONST SEGMENT ===
+    if (header.const_size > 0) {
+        VM->segmentos[indice].base = base;
+        VM->segmentos[indice].tam = header.const_size;
+        VM->reg[KS] = (indice << 16) | 0x0000;
+        base += header.const_size;
+        indice++;
+    } else {
+        VM->reg[KS] = 0xFFFFFFFF;
+    }
+
+    // === CODE SEGMENT ===
+    VM->segmentos[indice].base = base;
+    VM->segmentos[indice].tam = header.tam; // tamaño del código
+    VM->reg[CS] = (indice << 16) | 0x0000;
+    base += header.tam;
+    indice++;
+
+    // === DATA SEGMENT ===
+    if (header.data_size > 0) {
+        VM->segmentos[indice].base = base;
+        VM->segmentos[indice].tam = header.data_size;
+        VM->reg[DS] = (indice << 16) | 0x0000;
+        base += header.data_size;
+        indice++;
+    } else {
+        VM->reg[DS] = 0xFFFFFFFF;
+    }
+
+    // === EXTRA SEGMENT ===
+    if (header.extra_size > 0) {
+        VM->segmentos[indice].base = base;
+        VM->segmentos[indice].tam = header.extra_size;
+        VM->reg[ES] = (indice << 16) | 0x0000;
+        base += header.extra_size;
+        indice++;
+    } else {
+        VM->reg[ES] = 0xFFFFFFFF;
+    }
+
+    // === STACK SEGMENT ===
+    if (header.stack_size > 0) {
+        VM->segmentos[indice].base = base;
+        VM->segmentos[indice].tam = header.stack_size;
+        VM->reg[SS] = (indice << 16) | 0x0000;
+        // Puntero SP = tope de la pila (fuera de rango)
+        VM->reg[SP] = (indice << 16) | header.stack_size;
+        base += header.stack_size;
+        indice++;
+    } else {
+        VM->reg[SS] = 0xFFFFFFFF;
+        VM->reg[SP] = 0xFFFFFFFF;
+    }
+
+    // === Verificación de memoria total ===
+    if (base > VM->MEM_SIZE) {
+        printf("Error: Memoria insuficiente para alojar todos los segmentos.\n");
+        exit(1);
+    }
+
+    // === Debug ===
+    printf("\nTabla de segmentos generada:\n");
+    for (int i = 0; i < indice; i++) {
+        printf("[%d] base=%04X tam=%04X\n", i, VM->segmentos[i].base, VM->segmentos[i].tam);
+    }
 }
 
 void leoArch(TVM * VM, char nomarch[]) {
@@ -157,38 +234,78 @@ void leoArch(TVM * VM, char nomarch[]) {
 
 
         fread(&leo,sizeof(char),1,archb);
-         header.tam=leo;
-         header.tam=header.tam<<8;
-         fread(&leo,sizeof(char),1,archb);
-         header.tam+=leo;
+        header.tam=leo;
+        header.tam=header.tam<<8;
+        fread(&leo,sizeof(char),1,archb);
+        header.tam+=leo;
+        printf("id=%s version=%d, tam=%d\n",id,header.version, header.tam);
+
+        if (header.version >= 2) {
+            unsigned char b1, b2;
+
+            read(&b1, 1, 1, archb);
+            fread(&b2, 1, 1, archb);
+            header.data_size = (b1 << 8) | b2;
+
+            fread(&b1, 1, 1, archb);
+            fread(&b2, 1, 1, archb);
+            header.extra_size = (b1 << 8) | b2;
+
+            fread(&b1, 1, 1, archb);
+            fread(&b2, 1, 1, archb);
+            header.stack_size = (b1 << 8) | b2;
+
+            fread(&b1, 1, 1, archb);
+            fread(&b2, 1, 1, archb);
+            header.const_size = (b1 << 8) | b2;
+
+            fread(&b1, 1, 1, archb);
+            fread(&b2, 1, 1, archb);
+            header.entry_offset = (b1 << 8) | b2;
+
+           printf("DATA=%d EXTRA=%d STACK=%d CONST=%d ENTRY=%d\n",
+           header.data_size, header.extra_size,
+           header.stack_size, header.const_size, header.entry_offset);
+
+            } else {
+                // si el header es viejo o incompleto
+                header.data_size = header.extra_size = header.stack_size = 1024;
+                header.const_size = header.entry_offset = 0;
+            }
+
+            printf("DATA=%d EXTRA=%d STACK=%d CONST=%d ENTRY=%d\n",
+                   header.data_size, header.extra_size, header.stack_size,
+                   header.const_size, header.entry_offset);
+        } else {
+            // valores por defecto para MV1
+            header.data_size = header.extra_size = header.stack_size = 1024;
+            header.const_size = header.entry_offset = 0;
+        }
 
 
-         printf("id=%s version=%d, tam=%d\n",id,header.version, header.tam);
+        if (strcmp(id, "VMX25") == 0) {
+            // Versión extendida: ahora pasamos los tamaños leídos al inicializador
+            cargaSegmentos(VM, header.tam);
+            iniciaRegs(VM, header.tam);
 
-        //AGREGAR VALIDACIONES DE HEADER
-         if(strcmp(id, "VMX25") == 0 && header.version ==1) {
-                cargaSegmentos(VM,header.tam);
-           //    printf("Segmentos: CS=%08X, DS=%08X\n", VM->segmentos[CS], VM->segmentos[DS]);
-                iniciaRegs(VM,header.tam);
-            //   printf("Registros iniciales: CS=%08X, DS=%08X, IP=%08X\n", VM->reg[CS], VM->reg[DS], VM->reg[IP]);
-                //carga memoria
+            // === Carga del código a memoria ===
+            while (fread(&(VM->memory[i]), 1, 1, archb) == 1) {
+                i++;
+            }
 
-                while(fread(&(VM->memory[i]),1,1,archb)==1) {
-                     //lee de a 1 byte y carga la memoria con todo el codigo del .asm
-                    i++;
-                }
-                }
-            printf("Contenido de memoria (primeros 64 bytes):\n");
-            for (int j = 0; j < 64 && j < i; j++) {
-             printf("%02X ", VM->memory[j]);
-             if ((j+1) % 16 == 0) printf("\n");
-}
-      printf("\n");
-       fclose(archb);
+            // === Si existe Const Segment
+            if (header.const_size > 0) {
+                fread(&(VM->memory[i]), 1, header.const_size, archb);
+                i += header.const_size;
+            }
 
+        printf("\n");
+
+        }
+        fclose(archb);
     }
 
-}
+
 
 int getBase(int valor) {
   return (valor & 0xFFFF0000)>>16;

@@ -20,8 +20,9 @@
 #define OPC 4
 #define OP1 5
 #define OP2 6
-//6 7 8 RESERVADOS
-#define EAX 10 //uso general
+#define SP 7
+#define BP 8
+#define EAX 10
 #define EBX 11
 #define ECX 12
 #define EDX 13
@@ -32,7 +33,10 @@
 //18 - 28 RESERVADOS
 #define CS 26 //code segment
 #define DS 27 //data segment
-//28 - 31 RESERVADOS
+#define ES 28
+#define SS 29
+#define KS 30
+#define PS 31
 
 #define ERROR_INSTRUCCION 1
 #define ERROR_DIVISION_POR_CERO 2
@@ -44,19 +48,21 @@ typedef struct THeader{
     unsigned char c1,c2,c3,c4,c5;  //caracter por caracter o string?
     char version;
     unsigned short int tam;
+    int code_size, data_size, extra_size, stack_size, const_size, entry_offset;
 }THeader;
 
 typedef struct  {
     int reg[CANTREG];
-    int segmentos[SEG_TABLE]; //DescribeSegmentos segmentos[seg_table]; ????????????????
+    TSegmento segmentos[SEG_TABLE]; //DescribeSegmentos segmentos[seg_table]; ????????????????
     unsigned char memory[MEMORY_SIZE];
+    int param_size;
     //errores
 } TVM;
 
-typedef struct {
+typedef struct TSegmento {
   int base; //dirreccion base (2 bytes) // uint16_t 16 bits sin signo
   int tam; // tamanio d el segmento
-} DescribeSegmentos;
+} TSegmento;
 
 typedef struct {
   int valorA;
