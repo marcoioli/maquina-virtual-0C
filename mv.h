@@ -43,7 +43,8 @@
 #define ERROR_SEGMENTO 3
 #define ERROR_OPERANDO 4
 #define ERROR_MEMORIA_INSUFICIENTE 5
-
+#define STACK_OVERFLOW 6
+#define STACK_UNDERFLOW 7
 
 typedef struct THeader{
     unsigned char c1,c2,c3,c4,c5;  //caracter por caracter o string?
@@ -52,6 +53,12 @@ typedef struct THeader{
     int code_size, data_size, extra_size, stack_size, const_size, entry_offset;
 }THeader;
 
+typedef struct TSegmento{
+  int base; //dirreccion base (2 bytes) // uint16_t 16 bits sin signo
+  int tam; // tamanio d el segmento
+} TSegmento;
+
+
 typedef struct  {
     int reg[CANTREG];
     TSegmento segmentos[SEG_TABLE]; //DescribeSegmentos segmentos[seg_table]; ????????????????
@@ -59,11 +66,6 @@ typedef struct  {
     int param_size;
     //errores
 } TVM;
-
-typedef struct TSegmento {
-  int base; //dirreccion base (2 bytes) // uint16_t 16 bits sin signo
-  int tam; // tamanio d el segmento
-} TSegmento;
 
 typedef struct {
   int valorA;
@@ -83,13 +85,16 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]);
 
 //funciones del programa
 void declaraFunciones(vFunciones Funciones);
-void iniciaRegs(TVM *VM, int entry_offset)
-void cargaSegmentos(TVM *VM, THeader header)
-void cargaParametros(TVM *VM, int cant, char *params[])
-void leoArch(TVM * VM, char nomarch[]);
+void push(TVM *VM, unsigned int valor);
+void pop(TVM *VM, unsigned int *valor);
+
+void iniciaRegs(TVM *VM, int entry_offset);
+void cargaSegmentos(TVM *VM, THeader header);
+void cargaParametros(TVM *VM, int cant, char *params[]);
+void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]);
 void leoVMI(TVM *VM, char nomarch[]);
-int getBase(int valor);
-int getTam(int valor);
+int getBase(TSegmento seg);
+int getTam(TSegmento seg);
 int getDirfisica(TVM *VM, int offset,int segmento, int size);
 void ComponentesInstruccion(TVM *VM, int DirFisica, Instruccion *instr, int *CantOp, unsigned char *CodOp);
 void SeteoValorOp(TVM *VM,int DirFisicaActual,Instruccion *instr);
@@ -120,11 +125,12 @@ void JP(TVM *VM, Instruccion instruc);
 void JNP(TVM *VM, Instruccion instruc);
 void NOT(TVM *VM, Instruccion instruc);
 void SYS(TVM *VM, Instruccion instruc);
-void STOP(TVM * VM,Instruccion instruc);
-void PUS(TVM *VM, unsigned int valor);
-void POP(TVM *VM, unsigned int *valor);
-void CALL(TVM *VM, unsigned int destino);
-void RET(TVM *VM);
+void PUSH(TVM *VM, Instruccion instruc);
+void POP(TVM *VM, Instruccion instruc);
+void CALL(TVM *VM, Instruccion instruc);
+void RET(TVM *VM, Instruccion instruc);
+void STOP(TVM *VM, Instruccion instruc);
+
 
 
 
@@ -135,10 +141,10 @@ void imprimir_binario_nbits(int valor,int size);
 int random32();
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc);
 void actualizaCC(TVM *VM, int resultado);
-int guardaB(TVM *VM, Instruccion instruc);
-int leerMemoria(TVM *VM, int dirLogica, int size) ;
-void escribeMemoria(TVM * MV,int dirLogica, int valor, int size);
-void DefinoRegistro(int *CodReg, int Op);
+void guardaB(TVM *VM, Instruccion instruc, int *auxOpB);
+int leerMemoria(TVM *VM, int OP) ;
+void escribeMemoria(TVM *VM, int OP, int valor);
+void DefinoRegistro(int *codReg, int *sector, int op);
 void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg);
 
 void guardarVMI(TVM *VM, char nombre[]);

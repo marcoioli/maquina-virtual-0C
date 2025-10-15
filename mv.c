@@ -7,13 +7,10 @@
 
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
     //2 Operandos
-    
-    
-    
-    strcpy(Funciones[0x0B] = "PUSH";);
-    strcpy(Funciones[0x0C] = "POP";);
-    strcpy(Funciones[0xD] = "CALL";);
-    strcpy(Funciones[0x0E] =  "RET";);
+    strcpy(VecFunciones[0x0B],"PUSH");
+    strcpy(VecFunciones[0x0C], "POP");
+    strcpy(VecFunciones[0xD], "CALL");
+    strcpy(VecFunciones[0x0E],  "RET");
     strcpy(VecFunciones[0x11], "ADD");
     strcpy(VecFunciones[0x12], "SUB");
     strcpy(VecFunciones[0x13], "MUL");
@@ -29,8 +26,6 @@ void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
     strcpy(VecFunciones[0x1D], "LDL");
     strcpy(VecFunciones[0x1E], "LDH");
     strcpy(VecFunciones[0x1F], "RND");
-
-
     //1 Operando
     strcpy(VecFunciones[0x00], "SYS");
     strcpy(VecFunciones[0x02], "JZ");
@@ -85,13 +80,10 @@ void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga
     Funciones[0x06] = JNP;
     Funciones[0x07] = JNN;
     Funciones[0x08] = NOT;   
-
     Funciones[0x0B] = PUSH;
     Funciones[0x0C] = POP;
     Funciones[0x0D] = CALL;
     Funciones[0x0E] = RET;
-
-    
     // Instrucciones con dos operandos 
     Funciones[0x10] = MOV;   // 16 decimal
     Funciones[0x11] = ADD;   // 17 decimal  
@@ -128,9 +120,72 @@ void generaerror(int codigo) {
         case ERROR_MEMORIA_INSUFICIENTE:
             printf("[ERROR] Memoria insuficiente para alojar todos los segmentos\n");
             break;
+        case STACK_OVERFLOW:
+            printf("[ERROR] STACK OVERFLOW \n");
+            break;
+        case STACK_UNDERFLOW:
+            printf("[ERROR] STACK UNDERFLOW \n");
+            break;
     }
+
     exit(EXIT_FAILURE); // Aborta la ejecución
 }
+
+
+void push(TVM *VM, unsigned int valor) {
+    int segIndex = (VM->reg[SS] >> 16) & 0xFFFF;
+    int sp = VM->reg[SP] & 0xFFFF;
+    int baseSS = VM->segmentos[segIndex].base;
+    int tamSS  = VM->segmentos[segIndex].tam;
+
+    sp -= 4;
+
+    if (sp < 0) {
+        printf("[ERROR] Stack overflow (SP fuera de rango)\n");
+        generaerror(ERROR_SEGMENTO);
+        return;
+    }
+
+    int dirFis = baseSS + sp;
+
+    // escribe en memoria
+    VM->memory[dirFis + 0] = (valor >> 24) & 0xFF;
+    VM->memory[dirFis + 1] = (valor >> 16) & 0xFF;
+    VM->memory[dirFis + 2] = (valor >> 8)  & 0xFF;
+    VM->memory[dirFis + 3] = (valor >> 0)  & 0xFF;
+
+    //actualiza sp
+    VM->reg[SP] = (segIndex << 16) | (sp & 0xFFFF);
+}
+
+void pop(TVM *VM, unsigned int *valor) {
+    int segIndex = (VM->reg[SS] >> 16) & 0xFFFF;
+    int sp = VM->reg[SP] & 0xFFFF;
+    int baseSS = VM->segmentos[segIndex].base;
+    int tamSS  = VM->segmentos[segIndex].tam;
+
+    // 1️⃣ Verificar underflow
+    if ((sp + 4) > tamSS) {
+        printf("[ERROR] Stack underflow (SP fuera de rango)\n");
+        generaerror(STACK_UNDERFLOW);
+        return;
+    }
+
+    // 2️⃣ Calcular dirección física
+    int dirFis = baseSS + sp;
+
+    unsigned int val = 0;
+    val |= (VM->memory[dirFis + 0] << 24);
+    val |= (VM->memory[dirFis + 1] << 16);
+    val |= (VM->memory[dirFis + 2] << 8);
+    val |= (VM->memory[dirFis + 3]);
+
+    *valor = val;
+
+    sp += 4;
+    VM->reg[SP] = (segIndex << 16) | (sp & 0xFFFF);
+}
+
 
 void iniciaRegs(TVM *VM, int entry_offset) {
     // inicia ip
@@ -152,10 +207,9 @@ void iniciaRegs(TVM *VM, int entry_offset) {
     unsigned int argc    = 0;            // cantidad de parámetros
     unsigned int argvPtr = 0xFFFFFFFF;  // puntero a arreglo de parámetros
 
-    // Cuando tengas implementado PUSH, esto ya va a funcionar igual que en ejecución:
-   // push(VM, retMain);
-   // push(VM, argc);
-   // push(VM, argvPtr);
+    push(VM, retMain);
+    push(VM, argc);
+    push(VM, argvPtr);
 }
 
 void cargaParametros(TVM *VM, int cant, char *params[]) {
@@ -375,7 +429,7 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
         if (header.version >= 2) {
             unsigned char b1, b2;
 
-            read(&b1, 1, 1, archb);
+            fread(&b1, 1, 1, archb);
             fread(&b2, 1, 1, archb);
             header.data_size = (b1 << 8) | b2;
 
@@ -399,7 +453,8 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
            header.data_size, header.extra_size,
            header.stack_size, header.const_size, header.entry_offset);
 
-            } else {
+        } 
+        else {
                 // si el header es viejo o incompleto
                 header.data_size = header.extra_size = header.stack_size = 1024;
                 header.const_size = header.entry_offset = 0;
@@ -408,16 +463,13 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
             printf("DATA=%d EXTRA=%d STACK=%d CONST=%d ENTRY=%d\n",
                    header.data_size, header.extra_size, header.stack_size,
                    header.const_size, header.entry_offset);
-        } else {
-            // valores por defecto para MV1
-            header.data_size = header.extra_size = header.stack_size = 1024;
-            header.const_size = header.entry_offset = 0;
-        }
+        } 
+
 
 
         if (strcmp(id, "VMX25") == 0) {
             // Versión extendida: ahora pasamos los tamaños leídos al inicializador
-            cargaSegmentos(VM, header.tam);
+            cargaSegmentos(VM, header);
             if (cantParams> 0) {
                 cargaParametros(VM, cantParams, parametros); 
             }
@@ -444,13 +496,14 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
 
 
 
-int getBase(int valor) {
-  return (valor & 0xFFFF0000)>>16;
+int getBase(TSegmento seg) {
+    return seg.base;
 }
 
-int getTam(int valor) {
-  return (valor & 0x0000FFFF);
+int getTam(TSegmento seg) {
+    return seg.tam;
 }
+
 
 int getDirfisica(TVM *VM, int offset, int segmento, int size) {
     int base, tam, dirFisica;
@@ -458,17 +511,17 @@ int getDirfisica(TVM *VM, int offset, int segmento, int size) {
     // Validar índice de segmento
     if (segmento < 0 || segmento > SEG_TABLE) {
         generaerror(ERROR_SEGMENTO);
-        dirFis = -1;
+        dirFisica = -1;
     }
     else {
         if (tam <= 0) {
         generaerror(ERROR_SEGMENTO);
-        dirFis = -1;
+        dirFisica = -1;
         }
         else {
             if (offset < 0 || (offset + size) > tam) {
             generaerror(ERROR_SEGMENTO);
-            dirFis = -1;
+            dirFisica = -1;
             } 
             else {
                 base = VM->segmentos[segmento].base;
@@ -479,7 +532,7 @@ int getDirfisica(TVM *VM, int offset, int segmento, int size) {
         }
     }
 
-    return dirFis;
+    return dirFisica;
 
 }
 
@@ -507,24 +560,7 @@ void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *Ca
   }
 }
 
-/*void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
-    instr->valorA = 0;
-    instr->valorB = 0;
-
-    // --- Operando B ---
-    for (int i = 0; i < instr->sizeB; i++) {
-        instr->valorB = (instr->valorB << 8) | VM->memory[++dirFisicaActual];
-    }
-
-    // --- Operando A ---
-    for (int i = 0; i < instr->sizeA; i++) {
-        instr->valorA = (instr->valorA << 8) | VM->memory[++dirFisicaActual];
-    }
-
-}
-    */
-
-    void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
+void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
     instr->valorA = 0;
     instr->valorB = 0;
 
@@ -568,14 +604,16 @@ void leeIP(TVM *VM) {
 
     // El segmento de código siempre está en el índice guardado en CS
     segIndex = SEG_CS; //cambiar segun funcion log-to fis
+    
+    /*
     base = getBase(VM->segmentos[segIndex]);
     size = getTam(VM->segmentos[segIndex]);
+    Esto deberia funcionar
+    */
 
-    
-  //printf("[DEBUG] Inicio ejecución | segIndex=%d base=%d size=%d\n ac=%d", segIndex, base, size,VM->reg[AC]);
- //   printf("[SEGMENTOS] CODE SEGMENT %08X -- DATA SEGMENT %08X \n",VM->segmentos[SEG_CS],VM->segmentos[SEG_DS]);
-  // printf("VALORES INICIALES CS=%08X DS=%08X IP=%08X \n",VM->reg[CS],VM->reg[DS],VM->reg[IP]);
-    
+    segIndex = (VM->reg[CS] >> 16) & 0xFFFF; //cs ya esta cargado y no es fijo
+    base = VM->segmentos[segIndex].base;
+    size = VM->segmentos[segIndex].tam;
 
     // Ciclo de ejecución
     while (ejecutando) {
@@ -607,11 +645,16 @@ void leeIP(TVM *VM) {
 
              // actualiza ip
             if (VM->reg[IP] == ip_anterior ) {
-            VM->reg[IP] += 1 + instruc.sizeA + instruc.sizeB;
+            unsigned int ip = VM->reg[IP] & 0xFFFF;
+            ip += 1 + instruc.sizeA + instruc.sizeB;
+            VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (ip & 0xFFFF);
             }
+            //hay que asegurar que solo se modifiquen los 16 bits bajos del IP.
 
+
+            //(!((codOp <= 0x08) || (codOp >= 0x10 && codOp<= 0x1F)))
             // hace la funcion
-            if (!((codOp <= 0x08) || (codOp >= 0x10 && codOp<= 0x1F))) {
+            if (!((codOp >= 0x00 && codOp <= 0x4F))) {
                printf("[ERROR] Código de operación inválido: %02X\n", codOp);
                 ejecutando = 0;  // fin por error
             } else if (Funciones[codOp] != NULL) {
@@ -621,15 +664,13 @@ void leeIP(TVM *VM) {
         //        printf("[WARNING] Instrucción %02X no implementada\n", codOp);
             } 
             // Condición de parada por STOP
-            if (VM->reg[IP] == -1) {
-      //          printf("[STOP] Ejecución finalizada por instrucción STOP\n");
-                ejecutando = 0;
-            }
+            if ((VM->reg[IP] & 0xFFFF) == 0xFFFF)
+              ejecutando = 0;
         }
     }
 }
 
-void DefinoRegistro(int *codReg, int *sector, int op) {
+void DefinoRegistro(int *codReg,int*sector, int op) {
     *codReg = op & 0x1F;        
     *sector = (op >> 5) & 0x03; 
 }
@@ -790,8 +831,7 @@ void actualizaCC(TVM *VM, int resultado) {
 
 
 void guardaB(TVM *VM, Instruccion instruc, int *auxOpB) {
-    int codReg;
-    unsigned char SecB, CodOpB;
+    int SecB,CodOpB;
 
     switch (instruc.sizeB) {
         case 2: // inmediato
@@ -804,7 +844,7 @@ void guardaB(TVM *VM, Instruccion instruc, int *auxOpB) {
             break;
 
         case 3: // memoria
-            *auxOpB = leerMemoria(VM, VM->reg[OP2], 4);
+            *auxOpB = leerMemoria(VM, VM->reg[OP2]);
             break;
 
         default:
@@ -815,7 +855,7 @@ void guardaB(TVM *VM, Instruccion instruc, int *auxOpB) {
 
 
 void MOV(TVM *VM, Instruccion instruc) {
-    unsigned char SecA, SecB;
+    int SecA, SecB;
     int CodOpA, CodOpB;
     int valorA = 0, valorB = 0;
 
@@ -834,7 +874,7 @@ void MOV(TVM *VM, Instruccion instruc) {
 
 
 void ADD(TVM *VM, Instruccion instruc) {
-    unsigned char SecA, CodOpA;
+    int SecA, CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
     guardaB(VM, instruc, &valorB);
@@ -844,7 +884,7 @@ void ADD(TVM *VM, Instruccion instruc) {
         LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
 
         resultado = valorA + valorB;
-        EscribirSectorRegistro(VM, SecA, CodOpA, resultado);
+        escribirSectorRegistro(VM, SecA, CodOpA, resultado);
     }
     else if (instruc.sizeA == 3) { 
         // Memoria
@@ -858,7 +898,7 @@ void ADD(TVM *VM, Instruccion instruc) {
 }
 
 void SUB(TVM *VM, Instruccion instruc) {
-    unsigned char SecA, CodOpA;
+    int SecA, CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
     guardaB(VM, instruc, &valorB);
@@ -868,7 +908,7 @@ void SUB(TVM *VM, Instruccion instruc) {
         LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
 
         resultado = valorA - valorB;
-        EscribirSectorRegistro(VM, SecA, CodOpA, resultado);
+        escribirSectorRegistro(VM, SecA, CodOpA, resultado);
     }
     else if (instruc.sizeA == 3) { 
         valorA = leerMemoria(VM, instruc.valorA);
@@ -881,7 +921,7 @@ void SUB(TVM *VM, Instruccion instruc) {
 }
 
 void MUL(TVM *VM, Instruccion instruc) {
-    unsigned char SecA, CodOpA;
+    int SecA, CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
     guardaB(VM, instruc, &valorB);
@@ -891,7 +931,7 @@ void MUL(TVM *VM, Instruccion instruc) {
         LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
 
         resultado = valorA * valorB;
-        EscribirSectorRegistro(VM, SecA, CodOpA, resultado);
+        escribirSectorRegistro(VM, SecA, CodOpA, resultado);
     } else if (instruc.sizeA == 3) { 
         // Memoria
         valorA = leerMemoria(VM, instruc.valorA);
@@ -904,8 +944,7 @@ void MUL(TVM *VM, Instruccion instruc) {
 }
 
 void DIV(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
-    int CodOpA;
+    int CodOpA,SecA;
     int valorA = 0, valorB = 0, resultado = 0, resto = 0;
 
     // Obtengo el operando B
@@ -945,7 +984,7 @@ void DIV(TVM *VM, Instruccion instruc) {
 }
 
 void CMP(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
@@ -965,7 +1004,7 @@ void CMP(TVM *VM, Instruccion instruc) {
 }
 
 void SHL(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
@@ -989,7 +1028,7 @@ void SHL(TVM *VM, Instruccion instruc) {
 
 
 void SHR(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
@@ -1012,7 +1051,7 @@ void SHR(TVM *VM, Instruccion instruc) {
 }
 
 void SAR(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
@@ -1034,7 +1073,7 @@ void SAR(TVM *VM, Instruccion instruc) {
 }
 
 void AND(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
@@ -1058,7 +1097,7 @@ void AND(TVM *VM, Instruccion instruc) {
 
 
 void OR(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
@@ -1081,7 +1120,7 @@ void OR(TVM *VM, Instruccion instruc) {
 }
 
 void XOR(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorA = 0, valorB = 0, resultado = 0;
 
@@ -1105,7 +1144,7 @@ void XOR(TVM *VM, Instruccion instruc) {
 
 
 void SWAP(TVM *VM, Instruccion instruc) {
-    unsigned char SecA, SecB;
+    int SecA, SecB;
     int CodOpA, CodOpB;
     int valorA = 0, valorB = 0;
 
@@ -1138,7 +1177,7 @@ void SWAP(TVM *VM, Instruccion instruc) {
 }
 
 void LDH(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorB = 0, valorA = 0, resultado = 0;
 
@@ -1160,7 +1199,7 @@ void LDH(TVM *VM, Instruccion instruc) {
 
 
 void LDL(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorB = 0, valorA = 0, resultado = 0;
 
@@ -1187,7 +1226,7 @@ int random32() {
 }
 
 void RND(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorA = 0;
     int resultado;
@@ -1205,96 +1244,62 @@ void RND(TVM *VM, Instruccion instruc) {
     else generaerror(ERROR_OPERANDO);
 }
 
-void PUSH(TVM *VM, unsigned int valor) {
-    if (VM->reg[SS] == 0xFFFFFFFF) {
-        printf("Error: no existe Stack Segment.\n");
-        return;
+void PUSH(TVM *VM, Instruccion instruc) {
+    unsigned int valor = 0;
+
+    switch (instruc.sizeA) {
+        case 2: // inmediato
+            valor = instruc.valorA;
+            break;
+
+        case 1: // registro
+        {
+            int codReg, sec;
+            DefinoRegistro(&codReg, &sec, instruc.valorA);
+            LeerSectorRegistro((int *)&valor, VM, sec, codReg);
+            break;
+        }
+
+        case 3: // memoria
+            valor = leerMemoria(VM, instruc.valorA);
+            break;
+
+        default:
+            generaerror(ERROR_OPERANDO);
+            return;
     }
 
-    unsigned short ssIndex = (VM->reg[SS] >> 16);
-    unsigned int sp = VM->reg[SP] & 0xFFFF;
-    unsigned int baseSS = VM->segmentos[ssIndex].base;
-
-    // 1️⃣ Decrementar SP en 4
-    sp -= 4;
-
-    // 2️⃣ Chequear overflow: SP < base del segmento
-    if (sp < baseSS) {
-        printf("STACK OVERFLOW\n");
-        exit(1);
-    }
-
-    VM->reg[SP] = (ssIndex << 16) | sp;
-
-    // 3️⃣ 4️⃣ Ya recibimos el valor como parámetro (ya es un entero de 4 bytes)
-
-    // 5️⃣ Almacenar en la pila desde los bytes menos significativos
-    // (LSB primero, MSB al final)
-    unsigned int dirFis = baseSS + sp;
-
-    VM->memory[dirFis + 0] = (valor)       & 0xFF;  // LSB
-    VM->memory[dirFis + 1] = (valor >> 8)  & 0xFF;
-    VM->memory[dirFis + 2] = (valor >> 16) & 0xFF;
-    VM->memory[dirFis + 3] = (valor >> 24) & 0xFF;  // MSB
+    push(VM, valor);
 }
 
 
 
-void POP(TVM *VM, unsigned int *valor) {
+void POP(TVM *VM, Instruccion instruc) {
+    unsigned int val;
+    pop(VM, &val);
 
-    if (VM->reg[SS] == 0xFFFFFFFF) {
-        printf("Error: no existe Stack Segment.\n");
-        exit(1);
-    }
-
-    int  ssIndex = (VM->reg[SS] >> 16);
-    int sp = VM->reg[SP] & 0xFFFF;
-    int baseSS = VM->segmentos[ssIndex].base;
-    int tamSS  = VM->segmentos[ssIndex].tam;
-s
-    // (El tope está en la dirección que apunta SP)
-    int dirFis = baseSS + sp;
-
-    // hay espacio??????
-    if ((sp + 4) > tamSS) {
-        printf("STACK UNDERFLOW\n");
-        exit(1);
-    }
-
-    // reconstruye el valor
-     int val = 0;
-    val |= VM->memory[dirFis + 3] << 24;
-    val |= VM->memory[dirFis + 2] << 16;
-    val |= VM->memory[dirFis + 1] << 8;
-    val |= VM->memory[dirFis + 0];
-
-    // 4️⃣ Asignar valor extraído (ajuste al tamaño del operando)
-    //devuelve 4 bytes
-    *valor = val;
-
-    // 5️⃣ Incrementar SP en 4
-    sp += 4;
-    VM->reg[SP] = (ssIndex << 16) | sp;
+    int codReg, sec;
+    DefinoRegistro(&codReg, &sec, instruc.valorA);
+    escribirSectorRegistro(VM, codReg, sec, val);
 }
 
-
-void CALL(TVM *VM, unsigned int destino) {
+void CALL(TVM *VM, Instruccion instruc) {
+    // 1️⃣ Guardar el IP actual en la pila
     push(VM, VM->reg[IP]);
 
-    // 2️⃣ Modificar solo los 2 bytes menos significativos del IP con el destino
-    unsigned int ipActual = VM->reg[IP];
-    ipActual = (ipActual & 0xFFFF0000) | (destino & 0xFFFF); //4 bytes de IP, pone los 2 bytes el valor del operando
-    VM->reg[IP] = ipActual;
+    // 2️⃣ Saltar al destino (2 bytes menos significativos)
+    unsigned int destino = instruc.valorA;
+    VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (destino & 0xFFFF);
 }
 
-void ret(TVM *VM) {
-    int dirRet;
+void RET(TVM *VM, Instruccion instruc) {
+    unsigned int dirRet;
     pop(VM, &dirRet);
-    VM->reg[IP] = dirRet;
+    VM->reg[IP] = dirRet & 0xFFFF;
 }
 
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
-    int codReg, offset;
+    int codReg, offset,sec;
 
     // Resolver operando A (el destino del salto)
     switch (instruc.sizeA) {
@@ -1302,8 +1307,8 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
             offset = instruc.valorA;
             break;
         case 1: // registro
-            DefinoRegistro(&codReg, instruc.valorA);
-            offset = VM->reg[codReg];
+            DefinoRegistro(&codReg,&sec, instruc.valorA);
+            LeerSectorRegistro(&offset, VM, sec, codReg);
             break;
         case 3: // memoria
             offset = leerMemoria(VM, VM->reg[OP1]);
@@ -1322,7 +1327,7 @@ int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
         generaerror(ERROR_SEGMENTO);
         return -1;
     }
-
+  
     return offset; // <-- Retorna offset lógico, NO dirección física
 }
 
@@ -1374,7 +1379,7 @@ void JNP(TVM *VM, Instruccion instruc) {
 }
 
 void NOT(TVM *VM, Instruccion instruc) {
-    unsigned char SecA;
+    int SecA;
     int CodOpA;
     int valorA = 0, resultado = 0;
 
@@ -1395,8 +1400,9 @@ void NOT(TVM *VM, Instruccion instruc) {
 }
 
 
-void STOP(TVM * VM,Instruccion instruc) {
-    exit (0);
+void STOP(TVM *VM, Instruccion instruc) {
+    VM->reg[IP] = -1; // Detiene ejecución
+    printf("[STOP] Ejecución finalizada\n");
 }
 
 void SYS(TVM *VM, Instruccion instruc) {
@@ -1409,9 +1415,9 @@ void SYS(TVM *VM, Instruccion instruc) {
             servicio = instruc.valorA;
             break;
         case 1: { // registro
-            int codReg;
-            DefinoRegistro(&codReg, instruc.valorA);
-            servicio = VM->reg[codReg];
+            int codReg, sec;
+            DefinoRegistro(&codReg, &sec, instruc.valorA);
+            LeerSectorRegistro(&servicio, VM, sec, codReg);
             break;
         }
         case 3: // memoria
@@ -1428,9 +1434,9 @@ void SYS(TVM *VM, Instruccion instruc) {
     segmento = (logica >> 16) & 0xFFFF;
     offset = (logica & 0xFFFF);
 
-    // ---- SERVICIO 1: READ ----
-    if (servicio == 1) {
-        for (int i = 0; i < count; i++) {
+    switch(servicio) {
+        case 1: { //read
+            for (int i = 0; i < count; i++) {
             int offset_actual = offset + i * size;
             int dirFis = getDirfisica(VM, offset_actual, segmento, size);
             if (dirFis == -1) return; // error de acceso
@@ -1453,28 +1459,13 @@ void SYS(TVM *VM, Instruccion instruc) {
                 scanf("%d", &numero);
             }
 
-            // Guardar en memoria (LITTLE ENDIAN)
-           /* if (size == 1) {
-                VM->memory[dirFis] = numero & 0xFF;
-            } else if (size == 2) {
-                VM->memory[dirFis]     = numero & 0xFF;
-                VM->memory[dirFis + 1] = (numero >> 8) & 0xFF;
-            } else if (size == 4) {
-                for (int j = 0; j < 4; j++) {
-                    VM->memory[dirFis + j] = (numero >> (8 * j)) & 0xFF;
-                }
-            }
-           */   
-           
-            //guarda en LITTLE ENDIAN SIEMPRE
-            //deberia ser BIG ENDIAN????
            for (int j = 0; j < size; j++) {
               VM->memory[dirFis + j] = (numero >> (8 * (size - 1 - j))) & 0xFF;
            }
-}  
+        }  
+        break;
     }
-    // ---- SERVICIO 2: WRITE ----
-    else if (servicio == 2) {
+    case 2:{
         offset_inicial = offset;
         for (int i = 0; i < count; i++) {
             int offset_actual = offset_inicial + i * size;
@@ -1514,27 +1505,114 @@ void SYS(TVM *VM, Instruccion instruc) {
 
             printf("\n");
         }
-    }
+        break;
+        }
+        case 0x0F: {
+            printf("\n=== Breakpoint alcanzado ===\n");
+            guardarVMI(VM, "imagen.vmi");
+            printf("Imagen guardada. Opciones:\n");
+            printf("[g] continuar | [q] salir | [Enter] paso a paso\n");
 
-    /*
-    case 0x0F: // SYS F - Breakpoint
-    printf("\n=== Breakpoint alcanzado ===\n");
-    guardarVMI(VM, "imagen.vmi");
-    printf("Imagen guardada. Opciones:\n");
-    printf("[g] continuar | [q] salir | [Enter] paso a paso\n");
+            char opcion = getchar();
+            if (opcion == 'q') {
+                printf("Ejecución finalizada por usuario.\n");
+                exit(0);
+            } else if (opcion == 'g') {
+                printf("Continuando ejecución...\n");
+            } else {
+                printf("Ejecutando paso a paso...\n");
+                // modo debug futuro
+            }
+            break;
+        }
+        case 3: {
+           int logica, segmento, offset, tamMax;
 
-    char opcion = getchar();
-    if (opcion == 'q') {
-        printf("Ejecución finalizada por usuario.\n");
-        exit(0);
-    } else if (opcion == 'g') {
-        printf("Continuando ejecución...\n");
-    } else {
-        printf("Ejecutando paso a paso...\n");
-        // (podés agregar un modo debug acá más adelante)
-    }
-    break;
-    */
+            // Obtener dirección lógica destino desde EDX
+            logica   = VM->reg[EDX];
+            segmento = (logica >> 16) & 0xFFFF;
+            offset   = logica & 0xFFFF;
+
+            // Obtener cantidad máxima de caracteres desde ECX (parte baja)
+            tamMax = VM->reg[ECX] & 0xFFFF;
+            if (tamMax == -1 || tamMax > 255)
+                tamMax = 255;
+
+            // 3️⃣ Leer string desde teclado
+            char buffer[1024];
+            printf("[SYS3 INPUT]: ");
+            fflush(stdout);
+            fgets(buffer, sizeof(buffer), stdin);
+
+            // Eliminar salto de línea final si lo hay
+            size_t len = strlen(buffer);
+            if (len > 0 && buffer[len - 1] == '\n')
+                buffer[len - 1] = '\0';
+
+            // Limitar longitud según tamMax
+            if ((int)len > tamMax)
+                buffer[tamMax] = '\0';
+
+            int realLen = strlen(buffer);
+
+            // 4️⃣ Escribir en memoria (1 byte por carácter, orden natural)
+            for (int i = 0; i < realLen; i++) {
+                int dirFis = getDirfisica(VM, offset + i, segmento, 1);
+                if (dirFis == -1) {
+                    generaerror(ERROR_SEGMENTO);
+                    return;
+                }
+                VM->memory[dirFis] = (unsigned char) buffer[i];
+            }
+
+            // 5️⃣ Agregar terminador nulo (0x00)
+            int dirFis = getDirfisica(VM, offset + realLen, segmento, 1);
+            if (dirFis != -1)
+                VM->memory[dirFis] = 0x00;
+
+            printf("[SYS3] %d caracteres leídos y almacenados en memoria.\n", realLen);
+            break;
+        }
+        case 4: {
+            // Obtener dirección lógica inicial desde EDX
+            int logica   = VM->reg[EDX];
+            int segmento = (logica >> 16) & 0xFFFF;
+            int offset   = logica & 0xFFFF;
+
+            // Validar segmento
+            if (segmento >= SEG_TABLE || segmento == 0xFFFF) {
+                generaerror(ERROR_SEGMENTO);
+                return;
+            }
+
+            // Imprimir carácter a carácter hasta encontrar '\0'
+            printf("[SYS4 OUTPUT]: ");
+            while (1) {
+                int dirFis = getDirfisica(VM, offset, segmento, 1);
+                if (dirFis == -1) {
+                    generaerror(ERROR_SEGMENTO);
+                    return;
+                }
+
+                unsigned char ch = VM->memory[dirFis];
+                if (ch == 0x00) break; // fin de cadena
+                printf("%c", ch);
+
+                offset++; // avanzar
+            }
+
+            printf("\n");
+            break;
+        }
+        case 7: {
+            #ifdef _WIN32
+                system("cls");   // Windows
+            #else
+                system("clear"); // Linux / macOS
+            #endif
+            break;
+        }
+        }
 }
 
 
@@ -1576,42 +1654,6 @@ void imprimir_binario_nbits(int valor, int bits) {
 }
 
 
-// -------------------- DISASSEMBLER ------------------------//
-void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
-
-    unsigned char CodOp;
-    int CantOp,baseCS,tamCS;
-    Instruccion instruc;
-    int PosInicial,PosMemoria,PosFinal;
-
-   // int contador=0;
-
-    baseCS = getBase(VM->segmentos[SEG_CS]);
-    tamCS = getTam(VM->segmentos[SEG_CS]);
-
-    PosMemoria = baseCS;
-    PosFinal =  baseCS + tamCS;
-
-    while (PosMemoria < PosFinal) {
-
-        PosInicial=PosMemoria;
-        ComponentesInstruccion(VM,PosMemoria,&instruc,&CantOp,&CodOp);
-        SeteoValorOp(VM,PosMemoria,&instruc);
-
-        PosMemoria += instruc.sizeA+instruc.sizeB+1; // Posicion de la Siguiente instruccion
-        EscriboDissasembler(VM,VecFunciones,VecRegistros,CodOp,instruc,PosInicial,PosMemoria);
-
-      //  contador++;
-/*
-            if (CodOp == 0x0F) {  // STOP
-            printf("// Fin del código (STOP)\n");
-            break;
-            
-        }
-            */
-    }
-}
-
 void guardarVMI(TVM *VM, char nombre[]) {
     FILE *archb;
     unsigned char b1, b2;
@@ -1629,7 +1671,7 @@ void guardarVMI(TVM *VM, char nombre[]) {
     fwrite("VMI25", 1, 5, archb);
     char version = 1;
     fwrite(&version, 1, 1, archb);
-    int mem_kib = (int)(VM->MEM_SIZE / 1024);
+    int mem_kib = (int)(MEMORY_SIZE / 1024);
     b1 = (mem_kib >> 8) & 0xFF;
     b2 = (mem_kib) & 0xFF;
     fwrite(&b1, 1, 1, archb);
@@ -1663,9 +1705,40 @@ void guardarVMI(TVM *VM, char nombre[]) {
     }
 
     // === MEMORIA PRINCIPAL ===
-    fwrite(VM->memory, 1, VM->MEM_SIZE, archb);
+    fwrite(VM->memory, 1, MEMORY_SIZE, archb);
 
     fclose(archb);
+}
+
+
+
+
+// -------------------- DISASSEMBLER ------------------------//
+void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
+
+    unsigned char CodOp;
+    int CantOp,baseCS,tamCS;
+    Instruccion instruc;
+    int PosInicial,PosMemoria,PosFinal;
+
+   // int contador=0;
+
+    baseCS = getBase(VM->segmentos[SEG_CS]);
+    tamCS = getTam(VM->segmentos[SEG_CS]);
+
+    PosMemoria = baseCS;
+    PosFinal =  baseCS + tamCS;
+
+    while (PosMemoria < PosFinal) {
+
+        PosInicial=PosMemoria;
+        ComponentesInstruccion(VM,PosMemoria,&instruc,&CantOp,&CodOp);
+        SeteoValorOp(VM,PosMemoria,&instruc);
+
+        PosMemoria += instruc.sizeA+instruc.sizeB+1; // Posicion de la Siguiente instruccion
+        EscriboDissasembler(VM,VecFunciones,VecRegistros,CodOp,instruc,PosInicial,PosMemoria);
+
+    }
 }
 
 
@@ -1721,6 +1794,5 @@ void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegist
 
     printf("\n");
 }
-
 
 

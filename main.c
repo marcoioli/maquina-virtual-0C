@@ -51,12 +51,15 @@ int main(int argc, char *argv[]) {
 
     inicializoVecFunciones(VecFunciones);
     inicializoVecRegistros(VecRegistros);
+    
+    
 
     if (argc > 2) {
         if (!strcmp(argv[2],"-d")) { //si ejecutas main.exe prueba.vmx -d se ejecuta el dissasembler
             LeoDissasembler(&VM,VecFunciones,VecRegistros);
         }
     }
+
 
     printf("Comienza a leer IP \n");
     leeIP(&VM);
