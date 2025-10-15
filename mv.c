@@ -133,6 +133,8 @@ void generaerror(int codigo) {
 
 
 void push(TVM *VM, unsigned int valor) {
+
+
     int segIndex = (VM->reg[SS] >> 16) & 0xFFFF;
     int sp = VM->reg[SP] & 0xFFFF;
     int baseSS = VM->segmentos[segIndex].base;
@@ -140,9 +142,9 @@ void push(TVM *VM, unsigned int valor) {
 
     sp -= 4;
 
-    if (sp < 0) {
+    if (sp < 4) {
         printf("[ERROR] Stack overflow (SP fuera de rango)\n");
-        generaerror(ERROR_SEGMENTO);
+        generaerror(STACK_OVERFLOW);
         return;
     }
 
@@ -217,24 +219,27 @@ void cargaParametros(TVM *VM, int cant, char *params[]) {
     int offset = 0;
     int inicioString[50]; // hasta 50 parámetros, podés aumentar si querés
 
+    base = VM->segmentos[0].base;
+    offset = base;
+
     // === 1. Copiar los strings uno detrás del otro 
     for (i = 0; i < cant; i++) {
         inicioString[i] = offset; // guardo posición inicial del string i
         j = 0;
         while (params[i][j] != '\0') {
-            VM->memory[offset++] = params[i][j];
+            VM->memory[base + offset++] = params[i][j];
             j++;
         }
-        VM->memory[offset++] = '\0'; // terminator
+        VM->memory[base + offset++] = '\0'; // terminator
     }
 
     // guarda los punteros de cada string
     for (i = 0; i < cant; i++) {
         unsigned int puntero = (0 << 16) | inicioString[i]; // segmento PS (0)
-        VM->memory[offset++] = (puntero >> 24) & 0xFF;
-        VM->memory[offset++] = (puntero >> 16) & 0xFF;
-        VM->memory[offset++] = (puntero >> 8)  & 0xFF;
-        VM->memory[offset++] = (puntero)       & 0xFF;
+        VM->memory[base + offset++] = (puntero >> 24) & 0xFF;
+        VM->memory[base + offset++] = (puntero >> 16) & 0xFF;
+        VM->memory[base + offset++] = (puntero >> 8)  & 0xFF;
+        VM->memory[base + offset++] = (puntero)       & 0xFF;
     }
 
     //guardar tamanio del param segment
@@ -312,7 +317,7 @@ void cargaSegmentos(TVM *VM, THeader header) {
         VM->segmentos[indice].tam = header.stack_size;
         VM->reg[SS] = (indice << 16) | 0x0000;
         // Puntero SP = tope de la pila (fuera de rango)
-        VM->reg[SP] = (indice << 16) | header.stack_size;
+        VM->reg[SP] = (indice << 16) | (header.stack_size-4); //duda de si es -4 aca
         base += header.stack_size;
         indice++;
     } else {
@@ -321,7 +326,7 @@ void cargaSegmentos(TVM *VM, THeader header) {
     }
 
     // === Verificación de memoria total ===
-    if (base > MEMORY_SIZE) {
+    if (base >= MEMORY_SIZE) {
         generaerror(ERROR_MEMORIA_INSUFICIENTE);
     }
 
@@ -367,13 +372,13 @@ void leoVMI(TVM *VM, char nomarch[]) {
     for (i = 0; i < 32; i++) {
         unsigned int val = 0;
         fread(&b1, 1, 1, archb);
-        val |= (b1 << 24);
+        val |= ((unsigned int)b1 << 24);
         fread(&b1, 1, 1, archb);
-        val |= (b1 << 16);
+        val |= ((unsigned int)b1 << 16);
         fread(&b1, 1, 1, archb);
         val |= (b1 << 8);
         fread(&b1, 1, 1, archb);
-        val |= b1;
+        val |= (unsigned int)b1;
         VM->reg[i] = val;
     }
 
@@ -389,6 +394,11 @@ void leoVMI(TVM *VM, char nomarch[]) {
 
     // Toda la memoria
     int totalBytes = mem_kib * 1024;
+    if (totalBytes > MEMORY_SIZE) {
+        printf("Error: imagen .vmi excede la memoria disponible.\n");
+        fclose(archb);
+        return;
+    }
     fread(VM->memory, 1, totalBytes, archb);
 
     fclose(archb);
@@ -417,7 +427,6 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
         fread(&header.c5,sizeof(char),1,archb);
         fread(&header.version,sizeof(char),1,archb);
         sprintf(id, "%c%c%c%c%c", header.c1, header.c2, header.c3, header.c4, header.c5);
-
 
         fread(&leo,sizeof(char),1,archb);
         header.tam=leo;
@@ -448,34 +457,34 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
             fread(&b1, 1, 1, archb);
             fread(&b2, 1, 1, archb);
             header.entry_offset = (b1 << 8) | b2;
-
-           printf("DATA=%d EXTRA=%d STACK=%d CONST=%d ENTRY=%d\n",
-           header.data_size, header.extra_size,
-           header.stack_size, header.const_size, header.entry_offset);
-
         } 
         else {
                 // si el header es viejo o incompleto
                 header.data_size = header.extra_size = header.stack_size = 1024;
                 header.const_size = header.entry_offset = 0;
             }
+        } 
+
+
+            printf("Header leído correctamente: TAM=%d, ENTRY=%d\n",
+           header.tam, header.entry_offset);
 
             printf("DATA=%d EXTRA=%d STACK=%d CONST=%d ENTRY=%d\n",
-                   header.data_size, header.extra_size, header.stack_size,
-                   header.const_size, header.entry_offset);
-        } 
+            header.data_size, header.extra_size, header.stack_size,
+            header.const_size, header.entry_offset);
 
 
 
         if (strcmp(id, "VMX25") == 0) {
             // Versión extendida: ahora pasamos los tamaños leídos al inicializador
-            cargaSegmentos(VM, header);
             if (cantParams> 0) {
                 cargaParametros(VM, cantParams, parametros); 
             }
             else
              VM->param_size=0;
-            iniciaRegs(VM, header.tam);
+
+            cargaSegmentos(VM, header);
+            iniciaRegs(VM, header.entry_offset);
 
             // === Carga del código a memoria ===
             while (fread(&(VM->memory[i]), 1, 1, archb) == 1) {
@@ -485,7 +494,7 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
             // === Si existe Const Segment
             if (header.const_size > 0) {
                 fread(&(VM->memory[i]), 1, header.const_size, archb);
-                //esto no se si va i += header.const_size;
+                i += header.const_size;
             }
 
         printf("\n");
@@ -515,25 +524,22 @@ int getDirfisica(TVM *VM, int offset, int segmento, int size) {
     }
     else {
         if (tam <= 0) {
-        generaerror(ERROR_SEGMENTO);
-        dirFisica = -1;
+         generaerror(ERROR_SEGMENTO);
+         return -1;
         }
         else {
             if (offset < 0 || (offset + size) > tam) {
             generaerror(ERROR_SEGMENTO);
-            dirFisica = -1;
+            return -1;
             } 
             else {
                 base = VM->segmentos[segmento].base;
                 tam  = VM->segmentos[segmento].tam;
                 dirFisica = base + offset;
-                
+                return dirFisica;
             }
         }
     }
-
-    return dirFisica;
-
 }
 
 
@@ -560,6 +566,13 @@ void ComponentesInstruccion(TVM * VM, int DirFisica, Instruccion *instr, int *Ca
   }
 }
 
+int extenderSigno(int valor, int bytes) {
+    int msb = 1 << ((bytes * 8) - 1);
+    if (valor & msb)
+        valor |= ~((1 << (bytes * 8)) - 1);
+    return valor;
+}
+
 void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
     instr->valorA = 0;
     instr->valorB = 0;
@@ -570,11 +583,7 @@ void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
     }
     // Propagación de signo para inmediatos (sizeB == 2)
     if (instr->sizeB == 2) {
-        int bytes = instr->sizeB;
-        int msb = 1 << ((bytes * 8) - 1);
-        if (instr->valorB & msb) {
-            instr->valorB |= ~((1 << (bytes * 8)) - 1); // Extiende el signo a 32 bits
-        }
+       instr->valorB = extenderSigno(instr->valorB,2);
     }
 
     // --- Operando A ---
@@ -583,11 +592,7 @@ void SeteoValorOp(TVM * VM, int dirFisicaActual, Instruccion *instr) {
     }
     // Propagación de signo para inmediatos (sizeA == 2)
     if (instr->sizeA == 2) {
-        int bytes = instr->sizeA;
-        int msb = 1 << ((bytes * 8) - 1);
-        if (instr->valorA & msb) {
-            instr->valorA |= ~((1 << (bytes * 8)) - 1); // Extiende el signo a 32 bits
-        }
+         instr->valorA = extenderSigno(instr->valorA, 2);
     }
 }
 
@@ -602,15 +607,6 @@ void leeIP(TVM *VM) {
 
     declaraFunciones(Funciones);
 
-    // El segmento de código siempre está en el índice guardado en CS
-    segIndex = SEG_CS; //cambiar segun funcion log-to fis
-    
-    /*
-    base = getBase(VM->segmentos[segIndex]);
-    size = getTam(VM->segmentos[segIndex]);
-    Esto deberia funcionar
-    */
-
     segIndex = (VM->reg[CS] >> 16) & 0xFFFF; //cs ya esta cargado y no es fijo
     base = VM->segmentos[segIndex].base;
     size = VM->segmentos[segIndex].tam;
@@ -621,11 +617,11 @@ void leeIP(TVM *VM) {
 
         // Validar que no nos pasamos del segmento de código
         if (offset >= size) {
-       //     printf("[STOP] IP fuera de rango (offset=%d, size=%d)\n", offset, size);
+       //   printf("[STOP] IP fuera de rango (offset=%d, size=%d)\n", offset, size);
             ejecutando = 0; 
         } else {
             // Dirección física = base + offset
-            dirFisica = base + offset; //base del code segment y offset de ip
+            dirFisica = getDirfisica(VM,offset,segIndex,1);
             unsigned char rawInstr = VM->memory[dirFisica];
             ComponentesInstruccion(VM, dirFisica, &instruc, &cantOp, &codOp);
 
@@ -645,24 +641,22 @@ void leeIP(TVM *VM) {
 
              // actualiza ip
             if (VM->reg[IP] == ip_anterior ) {
-            unsigned int ip = VM->reg[IP] & 0xFFFF;
-            ip += 1 + instruc.sizeA + instruc.sizeB;
-            VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (ip & 0xFFFF);
+             unsigned int ip = VM->reg[IP] & 0xFFFF;
+             ip += 1 + instruc.sizeA + instruc.sizeB;
+             VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (ip & 0xFFFF);
             }
             //hay que asegurar que solo se modifiquen los 16 bits bajos del IP.
 
 
             //(!((codOp <= 0x08) || (codOp >= 0x10 && codOp<= 0x1F)))
             // hace la funcion
-            if (!((codOp >= 0x00 && codOp <= 0x4F))) {
-               printf("[ERROR] Código de operación inválido: %02X\n", codOp);
-                ejecutando = 0;  // fin por error
-            } else if (Funciones[codOp] != NULL) {
-        //       printf("[EXECUTE] Ejecutando opcode %02X...\n", codOp);
-                Funciones[codOp](VM, instruc);
-            } else {
-        //        printf("[WARNING] Instrucción %02X no implementada\n", codOp);
-            } 
+             if (codOp < CANTFUNC && Funciones[codOp] != NULL)
+               Funciones[codOp](VM, instruc);
+             else {
+             printf("[ERROR] Código de operación inválido: %02X\n", codOp);
+             ejecutando = 0;
+            }
+
             // Condición de parada por STOP
             if ((VM->reg[IP] & 0xFFFF) == 0xFFFF)
               ejecutando = 0;
@@ -1284,18 +1278,17 @@ void POP(TVM *VM, Instruccion instruc) {
 }
 
 void CALL(TVM *VM, Instruccion instruc) {
-    // 1️⃣ Guardar el IP actual en la pila
-    push(VM, VM->reg[IP]);
+    unsigned int retorno = VM->reg[IP] & 0xFFFF; // guardo solo offset
+    push(VM, retorno);
 
-    // 2️⃣ Saltar al destino (2 bytes menos significativos)
-    unsigned int destino = instruc.valorA;
-    VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (destino & 0xFFFF);
+    unsigned int destino = instruc.valorA & 0xFFFF;
+    VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | destino;
 }
 
 void RET(TVM *VM, Instruccion instruc) {
-    unsigned int dirRet;
+    unsigned int dirRet = 0;
     pop(VM, &dirRet);
-    VM->reg[IP] = dirRet & 0xFFFF;
+    VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (dirRet & 0xFFFF);
 }
 
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
