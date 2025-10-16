@@ -71,11 +71,6 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
     strcpy(VecRegistros[25], "");
     strcpy(VecRegistros[CS], "CS");
     strcpy(VecRegistros[DS], "DS");
-    
-    strcpy(VecRegistros[28], "");
-    strcpy(VecRegistros[29], "");
-    strcpy(VecRegistros[30], "");
-    strcpy(VecRegistros[31], "");
 }
 
 
@@ -489,13 +484,25 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]) {
 
     sprintf(id, "%c%c%c%c%c", header.c1, header.c2, header.c3, header.c4, header.c5);
 
-    // Intenta leer campos extendidos (si no hay bytes, se quedan en 0)
-    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.data_size  = (b1 << 8) | b2;
-    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.extra_size = (b1 << 8) | b2;
-    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.stack_size = (b1 << 8) | b2;
-    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.const_size = (b1 << 8) | b2;
-    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.entry_offset = (b1 << 8) | b2;
+   if (header.version == 1) {
+        printf("Detectada cabecera V1. Aplicando reglas de MV1.\n");
+        // En V1, los otros segmentos no están en el header.
+        // Los ponemos a 0 para que la lógica de defaults actúe.
+        header.data_size  = 0;
+        header.extra_size = 0;
+        header.stack_size = 0;
+        header.const_size = 0;
+        header.entry_offset = 0; // V1 siempre empieza en 0 [cite: 1103-1104]
 
+    } else if (header.version == 2) {
+        printf("Detectada cabecera V2.\n");
+        // V2: Leer el resto de la cabecera extendida
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.data_size  = (b1 << 8) | b2;
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.extra_size = (b1 << 8) | b2;
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.stack_size = (b1 << 8) | b2;
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.const_size = (b1 << 8) | b2;
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.entry_offset = (b1 << 8) | b2;
+    }
     // Valores por defecto (si no se pudieron leer)
     if (!header.data_size)  header.data_size  = 1024;
     if (!header.extra_size) header.extra_size = 1024;
@@ -690,7 +697,7 @@ void leeIP(TVM *VM) {
 
 void DefinoRegistro(int *codReg,int*sector, int op) {
     *codReg = op & 0x1F;        
-    *sector = (op >> 5) & 0x03; 
+    *sector = (op >> 6) & 0x03; 
 }
 
 void LeerSectorRegistro(int *AuxR,TVM * VM,unsigned char Sec,int CodReg){ 
@@ -728,7 +735,7 @@ void escribeMemoria(TVM *VM, int OP, int valor) {
     int size; // tamaño de la celda (1, 2 o 4 bytes)
 
     //  Extraer tamaño de celda desde los 2 bits más significativos
-    sizeBits = (OP >> 30) & 0x3;  // bits 31-30
+    sizeBits = (OP >> 22) & 0x3;  // bits 31-30
 
     switch (sizeBits) {
     case 0: size = 4; break; // long
@@ -740,7 +747,7 @@ void escribeMemoria(TVM *VM, int OP, int valor) {
     }
 
     // Extraer código de registro base (bits 24–28)
-    regact = (OP >> 25) & 0x1F;
+    regact = (OP >> 16) & 0x1F;
 
     // Extraer offset de 16 bits
     offop = OP & 0x0000FFFF;
@@ -792,7 +799,7 @@ int leerMemoria(TVM *VM, int OP) {
     int size;
     int valor = 0;
 
-    sizeBits = (OP >> 30) & 0x3;
+    sizeBits = (OP >> 22) & 0x3;
     
     switch (sizeBits) {
         case 0: size = 4; break; // long
@@ -803,7 +810,7 @@ int leerMemoria(TVM *VM, int OP) {
             return 0;
     }
     
-   regact = (OP >> 25) & 0x1F;
+   regact = (OP >> 16) & 0x1F;
 
     //Extraer offset de 16 bits (bits 0–15)
     offop = OP & 0x0000FFFF;
@@ -1896,11 +1903,11 @@ void MostrarPseudonimo(int codReg, int sec, char VecRegistros[CANTREG][4]) {
 
 void MostrarOperandoMemoria(TVM *VM, int operando, char VecRegistros[CANTREG][4]) {
 
-    int sizeBits = (operando >> 30) & 0x3;
+    int sizeBits = (operando >> 22) & 0x3;
     int size = sizeBits; // 00=long(4), 01=word(2), 10=byte(1), 11=reservado
     
     // Extraer registro base (bits 29-25, no 28-24)
-    int regBase = (operando >> 25) & 0x1F;
+    int regBase = (operando >> 16) & 0x1F;
     
     // Offset sigue siendo bits 15-0
     int offset = operando & 0xFFFF;
@@ -1910,9 +1917,9 @@ void MostrarOperandoMemoria(TVM *VM, int operando, char VecRegistros[CANTREG][4]
     // Mostrar modificador correcto
     switch (sizeBits) {
         case 0: printf("["); break;      // long (4 bytes) - por defecto
-        case 1: printf("w["); break;     // word (2 bytes)
-        case 2: printf("b["); break;     // byte (1 byte)
-        case 3: printf("?["); break;     // reservado
+        case 2: printf("w["); break;     // word (2 bytes)
+        case 3: printf("b["); break;     // byte (1 byte)
+        default: printf("?["); break;     // reservado
     }
     
     printf("%s", VecRegistros[regBase]);
