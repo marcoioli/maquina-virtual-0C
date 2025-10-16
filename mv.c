@@ -320,69 +320,100 @@ void cargaSegmentos(TVM *VM, THeader header) {
         VM->segmentos[i].base = 0;
         VM->segmentos[i].tam = 0;
     }
+      // Limpiar registros de segmento
+    VM->reg[PS] = 0xFFFFFFFF;
+    VM->reg[KS] = 0xFFFFFFFF;
+    VM->reg[CS] = 0xFFFFFFFF;
+    VM->reg[DS] = 0xFFFFFFFF;
+    VM->reg[ES] = 0xFFFFFFFF;
+    VM->reg[SS] = 0xFFFFFFFF;
+    VM->reg[SP] = 0xFFFFFFFF;
 
-    // ✅ CORRECCIÓN: PS siempre en base 0
-    if (VM->param_size > 0) {
-        VM->segmentos[0].base = 0x00000000;  // ← FORZAR base 0
-        VM->segmentos[0].tam = VM->param_size;
-        VM->reg[PS] = (0 << 16) | 0;  // segmento 0, offset 0
-        base = VM->param_size;  // siguiente segmento después de PS
-        indice = 1;  // PS ocupa índice 0
+
+    if (header.version == 1) {
+        // --- LÓGICA DE MV1 ---
+        printf("Aplicando layout de memoria MV1.\n");
+        
+        // Segmento 0 = CS
+        VM->segmentos[0].base = 0;
+        VM->segmentos[0].tam = header.tam;
+        VM->reg[CS] = (0 << 16) | 0; // El registro CS (26) apunta al segmento 0
+
+        // Segmento 1 = DS
+        VM->segmentos[1].base = header.tam;
+        VM->segmentos[1].tam = MEMORY_SIZE - header.tam; // DS ocupa todo el resto
+        VM->reg[DS] = (1 << 16) | 0; // El registro DS (27) apunta al segmento 1
+
+        // Imprimir tabla (solo 2 entradas)
+        printf("\nTabla de segmentos generada (MV1):\n");
+        printf("[0] base=%04X tam=%04X (CS)\n", VM->segmentos[0].base, VM->segmentos[0].tam);
+        printf("[1] base=%04X tam=%04X (DS)\n", VM->segmentos[1].base, VM->segmentos[1].tam);
+
     } else {
-        VM->reg[PS] = 0xFFFFFFFF;
-        base = 0;
-        indice = 0;  // sin PS, otros segmentos desde índice 0
-    }
+        // --- LÓGICA DE MV2 ---
+        printf("Aplicando layout de memoria MV2.\n");
+    
+        // ✅ CORRECCIÓN: PS siempre en base 0
+        if (VM->param_size > 0) {
+            VM->segmentos[0].base = 0x00000000;  // ← FORZAR base 0
+            VM->segmentos[0].tam = VM->param_size;
+            VM->reg[PS] = (0 << 16) | 0;  // segmento 0, offset 0
+            base = VM->param_size;  // siguiente segmento después de PS
+            indice = 1;  // PS ocupa índice 0
+        } else {
+            VM->reg[PS] = 0xFFFFFFFF;
+            base = 0;
+            indice = 0;  // sin PS, otros segmentos desde índice 0
+        }
 
-    // === CONST SEGMENT ===
-    if (header.const_size > 0) {
+        // === CONST SEGMENT ===
+        if (header.const_size > 0) {
+            VM->segmentos[indice].base = base;
+            VM->segmentos[indice].tam  = header.const_size;
+        //   VM->segmentos[indice].tam+=base;
+            VM->reg[KS] = (indice << 16) | 0;
+            base += header.const_size;
+            indice++;
+        } else VM->reg[KS] = 0xFFFFFFFF;
+
+        // === CODE SEGMENT ===
         VM->segmentos[indice].base = base;
-        VM->segmentos[indice].tam  = header.const_size;
-     //   VM->segmentos[indice].tam+=base;
-        VM->reg[KS] = (indice << 16) | 0;
-        base += header.const_size;
+        VM->segmentos[indice].tam  = header.tam;
+        //VM->segmentos[indice].tam+=base;
+        VM->reg[CS] = (indice << 16) | 0;
+        base += header.tam;
         indice++;
-    } else VM->reg[KS] = 0xFFFFFFFF;
 
-    // === CODE SEGMENT ===
-    VM->segmentos[indice].base = base;
-    VM->segmentos[indice].tam  = header.tam;
-    //VM->segmentos[indice].tam+=base;
-    VM->reg[CS] = (indice << 16) | 0;
-    base += header.tam;
-    indice++;
+        // === DATA SEGMENT ===
+        VM->segmentos[indice].base = base;
+        VM->segmentos[indice].tam  = header.data_size > 0 ? header.data_size : 1024;
+        //VM->segmentos[indice].tam+=base;
+        VM->reg[DS] = (indice << 16) | 0;
+        base += VM->segmentos[indice].tam;
+        indice++;
 
-    // === DATA SEGMENT ===
-    VM->segmentos[indice].base = base;
-    VM->segmentos[indice].tam  = header.data_size > 0 ? header.data_size : 1024;
-    //VM->segmentos[indice].tam+=base;
-    VM->reg[DS] = (indice << 16) | 0;
-    base += VM->segmentos[indice].tam;
-    indice++;
+        // === EXTRA SEGMENT ===
+        VM->segmentos[indice].base = base;
+        VM->segmentos[indice].tam  = header.extra_size > 0 ? header.extra_size : 1024;
+        //VM->segmentos[indice].tam+=base;
+        VM->reg[ES] = (indice << 16) | 0;
+        base += VM->segmentos[indice].tam;
+        indice++;
 
-    // === EXTRA SEGMENT ===
-    VM->segmentos[indice].base = base;
-    VM->segmentos[indice].tam  = header.extra_size > 0 ? header.extra_size : 1024;
-    //VM->segmentos[indice].tam+=base;
-    VM->reg[ES] = (indice << 16) | 0;
-    base += VM->segmentos[indice].tam;
-    indice++;
+        // === STACK SEGMENT ===
+        VM->segmentos[indice].base = base;
+        VM->segmentos[indice].tam  = header.stack_size > 0 ? header.stack_size : 1024;
+        //VM->segmentos[indice].tam+=base;
+        VM->reg[SS] = (indice << 16) | 0;
+        VM->reg[SP] = (indice << 16) | (VM->segmentos[indice].tam);
+        base += VM->segmentos[indice].tam;
+        indice++;
 
-    // === STACK SEGMENT ===
-    VM->segmentos[indice].base = base;
-    VM->segmentos[indice].tam  = header.stack_size > 0 ? header.stack_size : 1024;
-    //VM->segmentos[indice].tam+=base;
-    VM->reg[SS] = (indice << 16) | 0;
-    VM->reg[SP] = (indice << 16) | (VM->segmentos[indice].tam);
-    base += VM->segmentos[indice].tam;
-    indice++;
-
-    // --- DEBUG ---
-    printf("\nTabla de segmentos generada:\n");
-    for (int i = 0; i < indice; i++) {
-        printf("[%d] base=%04X tam=%04X\n", i, VM->segmentos[i].base, VM->segmentos[i].tam);
+        printf("\nTabla de segmentos generada:\n");
+        for (int i = 0; i < indice; i++) {
+            printf("[%d] base=%04X tam=%04X\n", i, VM->segmentos[i].base, VM->segmentos[i].tam);
     }
-
+    }
     printf("Registros de segmento:\n");
     printf("PS=%08X KS=%08X CS=%08X DS=%08X ES=%08X SS=%08X\n",
            VM->reg[PS], VM->reg[KS], VM->reg[CS],
@@ -460,7 +491,7 @@ void leoVMI(TVM *VM, char nomarch[]) {
     printf("Imagen cargada correctamente. Reanudando ejecución...\n");
 }
 
-void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]) {
+/*void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]) {
     FILE *archb;
     THeader header = {0};
     unsigned char b1, b2;
@@ -536,8 +567,106 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]) {
 
     fclose(archb);
     printf("Archivo cargado correctamente.\n");
-}
+} */
+// En mv.c, función leoArch
+void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]) {
+    FILE *archb;
+    THeader header = {0}; // Inicializar a ceros
+    unsigned char b1, b2;
+    char id[6];
+    int i = 0;
 
+    archb = fopen(nomarch, "rb");
+    if (!archb) {
+        printf("No se pudo abrir el archivo %s\n", nomarch);
+        return;
+    }
+
+    // Leer los 5 bytes de ID
+    fread(id, 1, 5, archb);
+    id[5] = '\0';
+    if (strcmp(id, "VMX25") != 0) {
+        printf("Archivo inválido.\n");
+        fclose(archb);
+        return;
+    }
+
+    // Leer 1 byte de Versión
+    fread(&header.version, 1, 1, archb);
+
+    // Leer 2 bytes de Tam (Tamaño de CS, común en ambas versiones)
+    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb);
+    header.tam = (b1 << 8) | b2; // CS_Size
+
+    // --- ¡LÓGICA DE VERSIÓN AQUÍ! ---
+    if (header.version == 1) {
+        printf("Detectada cabecera V1. Aplicando reglas de MV1.\n");
+        // El header V1 tiene 8 bytes. Ya lo leímos todo.
+        // Establecer valores por defecto para los campos V2
+        header.data_size  = 1024; // (Este valor será ignorado por cargaSegmentos V1)
+        header.extra_size = 1024;
+        header.stack_size = 1024;
+        header.const_size = 0;
+        header.entry_offset = 0; // V1 siempre empieza en 0
+    }
+    else if (header.version == 2) {
+        printf("Detectada cabecera V2.\n");
+        // Leer los 10 bytes restantes de la cabecera V2
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.data_size  = (b1 << 8) | b2;
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.extra_size = (b1 << 8) | b2;
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.stack_size = (b1 << 8) | b2;
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.const_size = (b1 << 8) | b2;
+        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.entry_offset = (b1 << 8) | b2;
+
+        // Aplicar defaults de V2 si los campos son 0
+        if (!header.data_size)  header.data_size  = 1024;
+        if (!header.extra_size) header.extra_size = 1024;
+        if (!header.stack_size) header.stack_size = 1024;
+    }
+    else {
+        printf("Error: Versión de VMX no soportada: %d\n", header.version);
+        fclose(archb);
+        return;
+    }
+    // ------------------------------------
+
+    // Imprimir lo que se leyó
+    printf("id=%s version=%d tam=%d entry=%d\n",
+           id, header.version, header.tam, header.entry_offset);
+    printf("DATA=%d EXTRA=%d STACK=%d CONST=%d\n",
+           header.data_size, header.extra_size,
+           header.stack_size, header.const_size);
+
+    if (cantParams > 0)
+        cargaParametros(VM, cantParams, parametros);
+    else
+        VM->param_size = 0;
+
+    // CargaSegmentos ahora usará la lógica correcta (MV1 o MV2)
+    cargaSegmentos(VM, header);
+    
+    // IniciaRegs usará el entry_offset (0 para V1, N para V2)
+    iniciaRegs(VM, header.entry_offset);
+
+    // --- CARGA DE CÓDIGO Y CONSTANTES ---
+    // El puntero del archivo está en la posición 8 (V1) o 18 (V2),
+    // ¡listo para leer el código!
+
+    // Cargar Code Segment
+    int cs_index = (VM->reg[CS] >> 16) & 0xFFFF;
+    int baseCode = getBase(VM->segmentos[cs_index]);
+    fread(&(VM->memory[baseCode]), 1, header.tam, archb);
+
+    // Cargar Const Segment (SOLO si es V2 y existe)
+    if (header.version == 2 && header.const_size > 0) {
+        int ks_index = (VM->reg[KS] >> 16) & 0xFFFF;
+        int baseConst = getBase(VM->segmentos[ks_index]);
+        fread(&(VM->memory[baseConst]), 1, header.const_size, archb);
+    }
+
+    fclose(archb);
+    printf("Archivo cargado correctamente.\n");
+}
 
 int getBase(TSegmento seg) {
     return seg.base;
@@ -915,7 +1044,7 @@ void ADD(TVM *VM, Instruccion instruc) {
         LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
 
         resultado = valorA + valorB;
-        escribirSectorRegistro(VM, SecA, CodOpA, resultado);
+        escribirSectorRegistro(VM, CodOpA,SecA, resultado);
     }
     else if (instruc.sizeA == 3) { 
         // Memoria
@@ -939,7 +1068,7 @@ void SUB(TVM *VM, Instruccion instruc) {
         LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
 
         resultado = valorA - valorB;
-        escribirSectorRegistro(VM, SecA, CodOpA, resultado);
+        escribirSectorRegistro(VM, CodOpA,SecA, resultado);
     }
     else if (instruc.sizeA == 3) { 
         valorA = leerMemoria(VM, instruc.valorA);
@@ -962,7 +1091,7 @@ void MUL(TVM *VM, Instruccion instruc) {
         LeerSectorRegistro(&valorA, VM, SecA, CodOpA);
 
         resultado = valorA * valorB;
-        escribirSectorRegistro(VM, SecA, CodOpA, resultado);
+        escribirSectorRegistro(VM,CodOpA,SecA, resultado);
     } else if (instruc.sizeA == 3) { 
         // Memoria
         valorA = leerMemoria(VM, instruc.valorA);
