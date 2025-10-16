@@ -6,40 +6,39 @@
 #include "mv.h"
 
 void inicializoVecFunciones(char VecFunciones[CANTFUNC][5]){
-    //2 Operandos
+  
+    strcpy(VecFunciones[0x00],"SYS");
+    strcpy(VecFunciones[0x01],"JMP");
+    strcpy(VecFunciones[0x02],"JZ");
+    strcpy(VecFunciones[0x03],"JP");
+    strcpy(VecFunciones[0x04],"JN");
+    strcpy(VecFunciones[0x05],"JNZ");
+    strcpy(VecFunciones[0x06],"JNP");
+    strcpy(VecFunciones[0x07],"JNN");
+    strcpy(VecFunciones[0x08],"NOT");
+    
     strcpy(VecFunciones[0x0B],"PUSH");
-    strcpy(VecFunciones[0x0C], "POP");
-    strcpy(VecFunciones[0xD], "CALL");
-    strcpy(VecFunciones[0x0E],  "RET");
-    strcpy(VecFunciones[0x11], "ADD");
-    strcpy(VecFunciones[0x12], "SUB");
-    strcpy(VecFunciones[0x13], "MUL");
-    strcpy(VecFunciones[0x14], "DIV");
-    strcpy(VecFunciones[0x15], "CMP");
-    strcpy(VecFunciones[0x16], "SHL");
-    strcpy(VecFunciones[0x17], "SHR");
-    strcpy(VecFunciones[0x18], "SAR");
-    strcpy(VecFunciones[0x19], "AND");
-    strcpy(VecFunciones[0x1A], "OR");
-    strcpy(VecFunciones[0x1B], "XOR");
-    strcpy(VecFunciones[0x1C], "SWAP");
-    strcpy(VecFunciones[0x1D], "LDL");
-    strcpy(VecFunciones[0x1E], "LDH");
-    strcpy(VecFunciones[0x1F], "RND");
-    //1 Operando
-    strcpy(VecFunciones[0x00], "SYS");
-    strcpy(VecFunciones[0x02], "JZ");
-    strcpy(VecFunciones[0x03], "JP");
-    strcpy(VecFunciones[0x01], "JMP");
-    strcpy(VecFunciones[0x04], "JN");
-    strcpy(VecFunciones[0x05], "JNZ");
-    strcpy(VecFunciones[0x06], "JNP");
-    strcpy(VecFunciones[0x07], "JNN");
-    strcpy(VecFunciones[0x08], "NOT");
-
-    //0 Operandos
-    strcpy(VecFunciones[0x0F], "STOP");
-
+    strcpy(VecFunciones[0x0C],"POP");
+    strcpy(VecFunciones[0x0D],"CALL");
+    strcpy(VecFunciones[0x0E],"RET");  
+    strcpy(VecFunciones[0x0F],"STOP");
+   
+    strcpy(VecFunciones[0x10],"MOV");
+    strcpy(VecFunciones[0x11],"ADD");
+    strcpy(VecFunciones[0x12],"SUB");
+    strcpy(VecFunciones[0x13],"MUL");
+    strcpy(VecFunciones[0x14],"DIV");
+    strcpy(VecFunciones[0x15],"CMP");
+    strcpy(VecFunciones[0x16],"SHL");
+    strcpy(VecFunciones[0x17],"SHR");
+    strcpy(VecFunciones[0x18],"SAR");
+    strcpy(VecFunciones[0x19],"AND");
+    strcpy(VecFunciones[0x1A],"OR");
+    strcpy(VecFunciones[0x1B],"XOR");
+    strcpy(VecFunciones[0x1C],"SWAP");
+    strcpy(VecFunciones[0x1D],"LDL");
+    strcpy(VecFunciones[0x1E],"LDH");
+    strcpy(VecFunciones[0x1F],"RND");
 }
 
 void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
@@ -50,19 +49,33 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
     strcpy(VecRegistros[OPC], "OPC");
     strcpy(VecRegistros[OP1], "OP1");
     strcpy(VecRegistros[OP2], "OP2");
-    strcpy(VecRegistros[7], "");
-    strcpy(VecRegistros[8], "");
+    strcpy(VecRegistros[SP], "SP");  
+    strcpy(VecRegistros[BP], "BP");  
     strcpy(VecRegistros[9], "");
     strcpy(VecRegistros[EAX], "EAX");
     strcpy(VecRegistros[EBX], "EBX");
     strcpy(VecRegistros[ECX], "ECX");
     strcpy(VecRegistros[EDX], "EDX");
-    strcpy(VecRegistros[EEX], "EEX");
-    strcpy(VecRegistros[EFX], "EFX");
-    strcpy(VecRegistros[CC], "CC");
-    strcpy(VecRegistros[AC], "AC");
+    strcpy(VecRegistros[EEX], "EEX"); 
+    strcpy(VecRegistros[EFX], "EFX"); 
+    strcpy(VecRegistros[CC], "CC");   
+    strcpy(VecRegistros[AC], "AC");   
+    strcpy(VecRegistros[ES], "ES");   
+    strcpy(VecRegistros[SS], "SS");   
+    strcpy(VecRegistros[KS], "KS");   
+    strcpy(VecRegistros[PS], "PS");   
+    
+    strcpy(VecRegistros[22], "");
+    strcpy(VecRegistros[23], "");
+    strcpy(VecRegistros[24], "");
+    strcpy(VecRegistros[25], "");
     strcpy(VecRegistros[CS], "CS");
     strcpy(VecRegistros[DS], "DS");
+    
+    strcpy(VecRegistros[28], "");
+    strcpy(VecRegistros[29], "");
+    strcpy(VecRegistros[30], "");
+    strcpy(VecRegistros[31], "");
 }
 
 
@@ -135,17 +148,23 @@ void generaerror(int codigo) {
 void push(TVM *VM, unsigned int valor) {
 
 
+
     int segIndex = (VM->reg[SS] >> 16) & 0xFFFF;
     int sp = VM->reg[SP] & 0xFFFF;
     int baseSS = VM->segmentos[segIndex].base;
     int tamSS  = VM->segmentos[segIndex].tam;
 
+    if (VM->reg[SS] == 0xFFFFFFFF) {
+    generaerror(STACK_OVERFLOW);
+    return;
+    }
+
     sp -= 4;
 
-    if (sp < 4) {
-        printf("[ERROR] Stack overflow (SP fuera de rango)\n");
-        generaerror(STACK_OVERFLOW);
-        return;
+    if (sp < 0) {
+    printf("[ERROR] Stack overflow (SP fuera de rango)\n");
+    generaerror(STACK_OVERFLOW);
+    return;
     }
 
     int dirFis = baseSS + sp;
@@ -167,7 +186,7 @@ void pop(TVM *VM, unsigned int *valor) {
     int tamSS  = VM->segmentos[segIndex].tam;
 
     // 1️⃣ Verificar underflow
-    if ((sp + 4) > tamSS) {
+    if  (sp >= tamSS) {
         printf("[ERROR] Stack underflow (SP fuera de rango)\n");
         generaerror(STACK_UNDERFLOW);
         return;
@@ -190,152 +209,192 @@ void pop(TVM *VM, unsigned int *valor) {
 
 
 void iniciaRegs(TVM *VM, int entry_offset) {
-    // inicia ip
+    // Inicializar registros que no existen por defecto
+    VM->reg[ES] = 0xFFFFFFFF;  // Por defecto no existe
+    VM->reg[SS] = 0xFFFFFFFF;  // Se configura en cargaSegmentos si existe
+    VM->reg[KS] = 0xFFFFFFFF;  // Se configura en cargaSegmentos si existe  
+    VM->reg[PS] = 0xFFFFFFFF;  // Se configura en cargaSegmentos si existe
+    
+    // Inicializar registros de control
+    VM->reg[CC] = 0;
+    VM->reg[AC] = 0;
+    VM->reg[SP] = 0xFFFFFFFF;  // Se configura en cargaSegmentos si hay stack
+    VM->reg[BP] = 0xFFFFFFFF;  // No requiere inicialización especial
+
+    // Validar que existe Code Segment
     if (VM->reg[CS] == 0xFFFFFFFF) {
         printf("Error: no hay Code Segment para iniciar IP.\n");
         return;
     }
 
-    //16 bits mas significativos, offset cs, y 16 menos con el entry point
+    // Inicializar IP con entry point
+    // 16 bits más significativos: selector de segmento CS
+    // 16 bits menos significativos: entry_offset
     int csIndex = (int)(VM->reg[CS] >> 16);
     VM->reg[IP] = ((unsigned int)csIndex << 16) | entry_offset;
 
-    // si hay stack segment, hay q inicializar la pila
-    if (VM->reg[SS] == 0xFFFFFFFF) 
-     return;
-
-    // valores por defecto (según enunciado MV2)
-    unsigned int retMain = 0xFFFFFFFF;  // dirección de retorno fuera de CS
-    unsigned int argc    = 0;            // cantidad de parámetros
-    unsigned int argvPtr = 0xFFFFFFFF;  // puntero a arreglo de parámetros
-
-    push(VM, retMain);
-    push(VM, argc);
-    push(VM, argvPtr);
+    // Configurar pila si existe Stack Segment
+    if (VM->reg[SS] != 0xFFFFFFFF) {
+        // Inicializar pila con valores por defecto
+        push(VM, 0xFFFFFFFF);  // dirección de retorno
+        push(VM, 0);           // argc dummy
+        push(VM, 0xFFFFFFFF);  // argv dummy
+        
+        // Si hay Param Segment, reemplazar con valores reales
+        if (VM->reg[PS] != 0xFFFFFFFF) {
+            unsigned int valor;
+            
+            // Buscar argc al final del PS
+            int ps_index = (VM->reg[PS] >> 16) & 0xFFFF;
+            int tamPS = VM->segmentos[ps_index].tam;
+            int basePS = VM->segmentos[ps_index].base;
+            
+            // Leer argc desde los últimos 4 bytes del PS
+            int argc = 0;
+            for (int i = 0; i < 4; i++) {
+                argc = (argc << 8) | VM->memory[basePS + tamPS - 4 + i];
+            }
+            
+            // Calcular dirección del array argv (justo antes de argc)
+            int argv_offset = tamPS - 4 - (argc * 4);
+            unsigned int argv_ptr = (ps_index << 16) | argv_offset;
+            
+            // Reemplazar valores dummy con reales
+            pop(VM, &valor); // quitar argv dummy
+            pop(VM, &valor); // quitar argc dummy
+            pop(VM, &valor); // quitar retorno dummy
+            
+            push(VM, 0xFFFFFFFF);  // dirección de retorno
+            push(VM, argc);        // argc real
+            push(VM, argv_ptr);    // argv real
+        }
+        
+        // Inicializar BP = SP (apunta al frame actual)
+        VM->reg[BP] = VM->reg[SP];
+    }
 }
 
 void cargaParametros(TVM *VM, int cant, char *params[]) {
-    int i, j;
     int offset = 0;
-    int inicioString[50]; // hasta 50 parámetros, podés aumentar si querés
-
-    base = VM->segmentos[0].base;
-    offset = base;
-
-    // === 1. Copiar los strings uno detrás del otro 
-    for (i = 0; i < cant; i++) {
-        inicioString[i] = offset; // guardo posición inicial del string i
-        j = 0;
-        while (params[i][j] != '\0') {
-            VM->memory[base + offset++] = params[i][j];
-            j++;
+    int inicioString[50];
+    
+    // copia strings
+    for (int i = 0; i < cant; i++) {
+        inicioString[i] = offset; // guardar posición de cada string
+        
+        // Copiar caracteres del string
+        for (int j = 0; params[i][j] != '\0'; j++) {
+            VM->memory[offset++] = params[i][j];
         }
-        VM->memory[base + offset++] = '\0'; // terminator
+        VM->memory[offset++] = '\0'; // terminador nulo
     }
-
-    // guarda los punteros de cada string
-    for (i = 0; i < cant; i++) {
-        unsigned int puntero = (0 << 16) | inicioString[i]; // segmento PS (0)
-        VM->memory[base + offset++] = (puntero >> 24) & 0xFF;
-        VM->memory[base + offset++] = (puntero >> 16) & 0xFF;
-        VM->memory[base + offset++] = (puntero >> 8)  & 0xFF;
-        VM->memory[base + offset++] = (puntero)       & 0xFF;
+    
+    // argv
+    int inicioArgv = offset;
+    for (int i = 0; i < cant; i++) {
+        // Puntero = (segmento PS << 16) | offset_string
+        unsigned int puntero = (0 << 16) | inicioString[i];
+        
+        // Almacenar en big-endian (4 bytes)
+        VM->memory[offset++] = (puntero >> 24) & 0xFF;
+        VM->memory[offset++] = (puntero >> 16) & 0xFF;
+        VM->memory[offset++] = (puntero >> 8) & 0xFF;
+        VM->memory[offset++] = puntero & 0xFF;
     }
-
-    //guardar tamanio del param segment
+    
+    //argc
+    VM->memory[offset++] = (cant >> 24) & 0xFF;
+    VM->memory[offset++] = (cant >> 16) & 0xFF;
+    VM->memory[offset++] = (cant >> 8) & 0xFF;
+    VM->memory[offset++] = cant & 0xFF;
+    
     VM->param_size = offset;
-
-    //los numeros se guardan como strings??? 
-
+    
+    printf("Param Segment creado: %d strings, argv en offset %d, argc=%d\n", 
+           cant, inicioArgv, cant);
 }
-
 
 void cargaSegmentos(TVM *VM, THeader header) {
     int base = 0;
-    int indice = 0;  // índice dentro de la tabla de descriptores
+    int indice = 0;
 
-    // Limpio la tabla de segmentos
+    memset(VM->memory, 0, MEMORY_SIZE);
+
+    // Limpio la tabla
     for (int i = 0; i < 8; i++) {
         VM->segmentos[i].base = 0;
         VM->segmentos[i].tam = 0;
     }
 
-    // === PARAM SEGMENT (si existe, según parámetros) ===
-    if (VM->param_size > 0) { // si cargaste parámetros con -p
-        VM->segmentos[indice].base = base;
-        VM->segmentos[indice].tam = VM->param_size;
-        VM->reg[PS] = (indice << 16) | 0x0000;
-        base += VM->param_size;
-        indice++;
+    // ✅ CORRECCIÓN: PS siempre en base 0
+    if (VM->param_size > 0) {
+        VM->segmentos[0].base = 0x00000000;  // ← FORZAR base 0
+        VM->segmentos[0].tam = VM->param_size;
+        VM->reg[PS] = (0 << 16) | 0;  // segmento 0, offset 0
+        base = VM->param_size;  // siguiente segmento después de PS
+        indice = 1;  // PS ocupa índice 0
     } else {
         VM->reg[PS] = 0xFFFFFFFF;
+        base = 0;
+        indice = 0;  // sin PS, otros segmentos desde índice 0
     }
 
     // === CONST SEGMENT ===
     if (header.const_size > 0) {
         VM->segmentos[indice].base = base;
-        VM->segmentos[indice].tam = header.const_size;
-        VM->reg[KS] = (indice << 16) | 0x0000;
+        VM->segmentos[indice].tam  = header.const_size;
+     //   VM->segmentos[indice].tam+=base;
+        VM->reg[KS] = (indice << 16) | 0;
         base += header.const_size;
         indice++;
-    } else {
-        VM->reg[KS] = 0xFFFFFFFF;
-    }
+    } else VM->reg[KS] = 0xFFFFFFFF;
 
     // === CODE SEGMENT ===
     VM->segmentos[indice].base = base;
-    VM->segmentos[indice].tam = header.tam; // tamaño del código
-    VM->reg[CS] = (indice << 16) | 0x0000;
+    VM->segmentos[indice].tam  = header.tam;
+    //VM->segmentos[indice].tam+=base;
+    VM->reg[CS] = (indice << 16) | 0;
     base += header.tam;
     indice++;
 
     // === DATA SEGMENT ===
-    if (header.data_size > 0) {
-        VM->segmentos[indice].base = base;
-        VM->segmentos[indice].tam = header.data_size;
-        VM->reg[DS] = (indice << 16) | 0x0000;
-        base += header.data_size;
-        indice++;
-    } else {
-        VM->reg[DS] = 0xFFFFFFFF;
-    }
+    VM->segmentos[indice].base = base;
+    VM->segmentos[indice].tam  = header.data_size > 0 ? header.data_size : 1024;
+    //VM->segmentos[indice].tam+=base;
+    VM->reg[DS] = (indice << 16) | 0;
+    base += VM->segmentos[indice].tam;
+    indice++;
 
     // === EXTRA SEGMENT ===
-    if (header.extra_size > 0) {
-        VM->segmentos[indice].base = base;
-        VM->segmentos[indice].tam = header.extra_size;
-        VM->reg[ES] = (indice << 16) | 0x0000;
-        base += header.extra_size;
-        indice++;
-    } else {
-        VM->reg[ES] = 0xFFFFFFFF;
-    }
+    VM->segmentos[indice].base = base;
+    VM->segmentos[indice].tam  = header.extra_size > 0 ? header.extra_size : 1024;
+    //VM->segmentos[indice].tam+=base;
+    VM->reg[ES] = (indice << 16) | 0;
+    base += VM->segmentos[indice].tam;
+    indice++;
 
     // === STACK SEGMENT ===
-    if (header.stack_size > 0) {
-        VM->segmentos[indice].base = base;
-        VM->segmentos[indice].tam = header.stack_size;
-        VM->reg[SS] = (indice << 16) | 0x0000;
-        // Puntero SP = tope de la pila (fuera de rango)
-        VM->reg[SP] = (indice << 16) | (header.stack_size-4); //duda de si es -4 aca
-        base += header.stack_size;
-        indice++;
-    } else {
-        VM->reg[SS] = 0xFFFFFFFF;
-        VM->reg[SP] = 0xFFFFFFFF;
-    }
+    VM->segmentos[indice].base = base;
+    VM->segmentos[indice].tam  = header.stack_size > 0 ? header.stack_size : 1024;
+    //VM->segmentos[indice].tam+=base;
+    VM->reg[SS] = (indice << 16) | 0;
+    VM->reg[SP] = (indice << 16) | (VM->segmentos[indice].tam);
+    base += VM->segmentos[indice].tam;
+    indice++;
 
-    // === Verificación de memoria total ===
-    if (base >= MEMORY_SIZE) {
-        generaerror(ERROR_MEMORIA_INSUFICIENTE);
-    }
-
-    // === Debug ===
+    // --- DEBUG ---
     printf("\nTabla de segmentos generada:\n");
     for (int i = 0; i < indice; i++) {
         printf("[%d] base=%04X tam=%04X\n", i, VM->segmentos[i].base, VM->segmentos[i].tam);
     }
+
+    printf("Registros de segmento:\n");
+    printf("PS=%08X KS=%08X CS=%08X DS=%08X ES=%08X SS=%08X\n",
+           VM->reg[PS], VM->reg[KS], VM->reg[CS],
+           VM->reg[DS], VM->reg[ES], VM->reg[SS]);
 }
+
+
 
 void leoVMI(TVM *VM, char nomarch[]) {
     FILE *archb;
@@ -406,103 +465,71 @@ void leoVMI(TVM *VM, char nomarch[]) {
     printf("Imagen cargada correctamente. Reanudando ejecución...\n");
 }
 
-
-void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]){
-    FILE * archb;
-    THeader header;
-    char t1,t2;
-    int i=0;
+void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]) {
+    FILE *archb;
+    THeader header = {0};
+    unsigned char b1, b2;
     char id[6];
+    int i = 0;
 
-    unsigned char leo;
-
-    archb = fopen(nomarch,"rb");
-    if(archb==NULL)
-        printf("No se pudo abrir el archivo .asm");
-    else {
-        fread(&header.c1,sizeof(char),1,archb);
-        fread(&header.c2,sizeof(char),1,archb);
-        fread(&header.c3,sizeof(char),1,archb);
-        fread(&header.c4,sizeof(char),1,archb);
-        fread(&header.c5,sizeof(char),1,archb);
-        fread(&header.version,sizeof(char),1,archb);
-        sprintf(id, "%c%c%c%c%c", header.c1, header.c2, header.c3, header.c4, header.c5);
-
-        fread(&leo,sizeof(char),1,archb);
-        header.tam=leo;
-        header.tam=header.tam<<8;
-        fread(&leo,sizeof(char),1,archb);
-        header.tam+=leo;
-        printf("id=%s version=%d, tam=%d\n",id,header.version, header.tam);
-
-        if (header.version >= 2) {
-            unsigned char b1, b2;
-
-            fread(&b1, 1, 1, archb);
-            fread(&b2, 1, 1, archb);
-            header.data_size = (b1 << 8) | b2;
-
-            fread(&b1, 1, 1, archb);
-            fread(&b2, 1, 1, archb);
-            header.extra_size = (b1 << 8) | b2;
-
-            fread(&b1, 1, 1, archb);
-            fread(&b2, 1, 1, archb);
-            header.stack_size = (b1 << 8) | b2;
-
-            fread(&b1, 1, 1, archb);
-            fread(&b2, 1, 1, archb);
-            header.const_size = (b1 << 8) | b2;
-
-            fread(&b1, 1, 1, archb);
-            fread(&b2, 1, 1, archb);
-            header.entry_offset = (b1 << 8) | b2;
-        } 
-        else {
-                // si el header es viejo o incompleto
-                header.data_size = header.extra_size = header.stack_size = 1024;
-                header.const_size = header.entry_offset = 0;
-            }
-        } 
-
-
-            printf("Header leído correctamente: TAM=%d, ENTRY=%d\n",
-           header.tam, header.entry_offset);
-
-            printf("DATA=%d EXTRA=%d STACK=%d CONST=%d ENTRY=%d\n",
-            header.data_size, header.extra_size, header.stack_size,
-            header.const_size, header.entry_offset);
-
-
-
-        if (strcmp(id, "VMX25") == 0) {
-            // Versión extendida: ahora pasamos los tamaños leídos al inicializador
-            if (cantParams> 0) {
-                cargaParametros(VM, cantParams, parametros); 
-            }
-            else
-             VM->param_size=0;
-
-            cargaSegmentos(VM, header);
-            iniciaRegs(VM, header.entry_offset);
-
-            // === Carga del código a memoria ===
-            while (fread(&(VM->memory[i]), 1, 1, archb) == 1) {
-                i++;
-            }
-
-            // === Si existe Const Segment
-            if (header.const_size > 0) {
-                fread(&(VM->memory[i]), 1, header.const_size, archb);
-                i += header.const_size;
-            }
-
-        printf("\n");
-
-        }
-        fclose(archb);
+    archb = fopen(nomarch, "rb");
+    if (!archb) {
+        printf("No se pudo abrir el archivo %s\n", nomarch);
+        return;
     }
 
+    fread(&header.c1, 1, 1, archb);
+    fread(&header.c2, 1, 1, archb);
+    fread(&header.c3, 1, 1, archb);
+    fread(&header.c4, 1, 1, archb);
+    fread(&header.c5, 1, 1, archb);
+    fread(&header.version, 1, 1, archb);
+    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb);
+    header.tam = (b1 << 8) | b2;
+
+    sprintf(id, "%c%c%c%c%c", header.c1, header.c2, header.c3, header.c4, header.c5);
+
+    // Intenta leer campos extendidos (si no hay bytes, se quedan en 0)
+    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.data_size  = (b1 << 8) | b2;
+    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.extra_size = (b1 << 8) | b2;
+    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.stack_size = (b1 << 8) | b2;
+    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.const_size = (b1 << 8) | b2;
+    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.entry_offset = (b1 << 8) | b2;
+
+    // Valores por defecto (si no se pudieron leer)
+    if (!header.data_size)  header.data_size  = 1024;
+    if (!header.extra_size) header.extra_size = 1024;
+    if (!header.stack_size) header.stack_size = 1024;
+    if (!header.const_size) header.const_size = 0;
+    if (!header.entry_offset) header.entry_offset = 0;
+
+    printf("id=%s version=%d tam=%d entry=%d\n",
+           id, header.version, header.tam, header.entry_offset);
+    printf("DATA=%d EXTRA=%d STACK=%d CONST=%d\n",
+           header.data_size, header.extra_size,
+           header.stack_size, header.const_size);
+
+    if (strcmp(id, "VMX25") != 0) {
+        printf("Archivo inválido.\n");
+        fclose(archb);
+        return;
+    }
+
+    if (cantParams > 0)
+        cargaParametros(VM, cantParams, parametros);
+    else
+        VM->param_size = 0;
+
+    cargaSegmentos(VM, header);
+    iniciaRegs(VM, header.entry_offset);
+
+    // Cargar código directamente en el segmento CODE
+    int baseCode = getBase(VM->segmentos[(VM->reg[CS] >> 16)]);
+    fread(&(VM->memory[baseCode]), 1, header.tam, archb);
+
+    fclose(archb);
+    printf("Archivo cargado correctamente.\n");
+}
 
 
 int getBase(TSegmento seg) {
@@ -515,31 +542,23 @@ int getTam(TSegmento seg) {
 
 
 int getDirfisica(TVM *VM, int offset, int segmento, int size) {
-    int base, tam, dirFisica;
+    int base, tam;
 
-    // Validar índice de segmento
-    if (segmento < 0 || segmento > SEG_TABLE) {
+    if (segmento < 0 || segmento >= SEG_TABLE) {
         generaerror(ERROR_SEGMENTO);
-        dirFisica = -1;
+        return -1;
     }
-    else {
-        if (tam <= 0) {
-         generaerror(ERROR_SEGMENTO);
-         return -1;
-        }
-        else {
-            if (offset < 0 || (offset + size) > tam) {
-            generaerror(ERROR_SEGMENTO);
-            return -1;
-            } 
-            else {
-                base = VM->segmentos[segmento].base;
-                tam  = VM->segmentos[segmento].tam;
-                dirFisica = base + offset;
-                return dirFisica;
-            }
-        }
+
+    base = VM->segmentos[segmento].base;
+    tam = VM->segmentos[segmento].tam;
+
+    // Validar que el acceso completo esté dentro del segmento
+    if (offset < 0 || (offset + size - 1) >= tam) {
+        generaerror(ERROR_SEGMENTO);
+        return -1;
     }
+
+    return base + offset;
 }
 
 
@@ -607,6 +626,12 @@ void leeIP(TVM *VM) {
 
     declaraFunciones(Funciones);
 
+    int csIndex = (VM->reg[CS] >> 16) & 0xFFFF;
+    if (VM->reg[CS] == 0xFFFFFFFF || csIndex >= SEG_TABLE) {
+        printf("[ERROR] Code Segment no válido\n");
+        return;
+    }
+    
     segIndex = (VM->reg[CS] >> 16) & 0xFFFF; //cs ya esta cargado y no es fijo
     base = VM->segmentos[segIndex].base;
     size = VM->segmentos[segIndex].tam;
@@ -646,7 +671,6 @@ void leeIP(TVM *VM) {
              VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (ip & 0xFFFF);
             }
             //hay que asegurar que solo se modifiquen los 16 bits bajos del IP.
-
 
             //(!((codOp <= 0x08) || (codOp >= 0x10 && codOp<= 0x1F)))
             // hace la funcion
@@ -706,10 +730,17 @@ void escribeMemoria(TVM *VM, int OP, int valor) {
     //  Extraer tamaño de celda desde los 2 bits más significativos
     sizeBits = (OP >> 30) & 0x3;  // bits 31-30
 
-    size = 4 - sizeBits; // 00=4 bytes, 01=2 bytes, 10=1 byte
+    switch (sizeBits) {
+    case 0: size = 4; break; // long
+    case 1: size = 2; break; // word  
+    case 2: size = 1; break; // byte
+     default: 
+        generaerror(ERROR_OPERANDO);
+        return;
+    }
 
     // Extraer código de registro base (bits 24–28)
-    regact = (OP >> 24) & 0x1F;
+    regact = (OP >> 25) & 0x1F;
 
     // Extraer offset de 16 bits
     offop = OP & 0x0000FFFF;
@@ -735,12 +766,6 @@ void escribeMemoria(TVM *VM, int OP, int valor) {
         return;
     }
 
-    // Calcular offset efectivo
-    //offset = offreg + offop; capaz es solo asi siempre
-
-    // if (offreg == 0)
-    //     offset = offop;
-    // else
     offset = offreg + offop;
 
     // Cargar LAR
@@ -767,13 +792,18 @@ int leerMemoria(TVM *VM, int OP) {
     int size;
     int valor = 0;
 
-    // Extraer tamaño de celda desde los bits 31–30
     sizeBits = (OP >> 30) & 0x3;
-
-    size = 4 - sizeBits; // 00=4 bytes, 01=2 bytes, 10=1 byte
     
-    // Extraer código de registro base (bits 24–28)
-    regact = (OP >> 24) & 0x1F;
+    switch (sizeBits) {
+        case 0: size = 4; break; // long
+        case 1: size = 2; break; // word 
+        case 2: size = 1; break; // byte
+        default: 
+            generaerror(ERROR_OPERANDO);
+            return 0;
+    }
+    
+   regact = (OP >> 25) & 0x1F;
 
     //Extraer offset de 16 bits (bits 0–15)
     offop = OP & 0x0000FFFF;
@@ -1266,15 +1296,30 @@ void PUSH(TVM *VM, Instruccion instruc) {
     push(VM, valor);
 }
 
-
-
 void POP(TVM *VM, Instruccion instruc) {
     unsigned int val;
     pop(VM, &val);
 
-    int codReg, sec;
-    DefinoRegistro(&codReg, &sec, instruc.valorA);
-    escribirSectorRegistro(VM, codReg, sec, val);
+    switch (instruc.sizeA) {
+        case 1: { // registro
+            int codReg, sec;
+            DefinoRegistro(&codReg, &sec, instruc.valorA);
+            
+            // CORREGIR: Truncar valor según el sector
+            if (sec == 1 || sec == 2) val &= 0xFF;        // byte
+            else if (sec == 3) val &= 0xFFFF;             // word
+            // sec == 0 mantiene 32 bits completos
+            
+            escribirSectorRegistro(VM, codReg, sec, val);
+            break;
+        }
+        case 3: { // memoria
+            escribeMemoria(VM, instruc.valorA, val);
+            break;
+        }
+        default:
+            generaerror(ERROR_OPERANDO);
+    }
 }
 
 void CALL(TVM *VM, Instruccion instruc) {
@@ -1703,89 +1748,180 @@ void guardarVMI(TVM *VM, char nombre[]) {
     fclose(archb);
 }
 
+// -------------------- DISASSEMBLER CORREGIDO ------------------------//
 
-
-
-// -------------------- DISASSEMBLER ------------------------//
-void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]) {
+void LeoDissasembler(TVM * VM, char VecFunciones[CANTFUNC][5], char VecRegistros[CANTREG][4]) {
 
     unsigned char CodOp;
-    int CantOp,baseCS,tamCS;
+    int CantOp, baseCS, tamCS;
     Instruccion instruc;
-    int PosInicial,PosMemoria,PosFinal;
+    int PosInicial, PosMemoria, PosFinal;
 
-   // int contador=0;
+    int entry = VM->reg[IP] & 0xFFFF;
 
-    baseCS = getBase(VM->segmentos[SEG_CS]);
-    tamCS = getTam(VM->segmentos[SEG_CS]);
+    // === MOSTRAR CADENAS DEL SEGMENTO CONSTANTE (KS) ===
+    if (VM->reg[KS] != 0xFFFFFFFF) {
+        int ks_index = (VM->reg[KS] >> 16) & 0xFFFF;
+        int baseKS = getBase(VM->segmentos[ks_index]);
+        int tamKS  = getTam(VM->segmentos[ks_index]);
+        
+        printf("=== Segmento de Constantes ===\n");
+        int i = 0;
+        while (i < tamKS) {
+            int inicio = i;
+            // Buscar el final de la cadena (terminador nulo)
+            while (i < tamKS && VM->memory[baseKS + i] != 0) i++;
+            int fin = i;
+
+            if (fin > inicio) { // Solo mostrar si hay contenido
+                printf("[%04X] ", baseKS + inicio);
+
+                // Mostrar hasta 7 bytes en hex, si supera mostrar ".."
+                int k;
+                for (k = 0; k <= fin - inicio && k < 7; k++)
+                    printf("%02X ", VM->memory[baseKS + inicio + k]);
+                if ((fin - inicio) >= 7) printf(".. ");
+                else {
+                    // Completar espacios para alinear
+                    while (k < 4) {
+                        printf("   ");
+                        k++;
+                    }
+                }
+
+                printf("| \"");
+                for (k = inicio; k < fin; k++) {
+                    unsigned char c = VM->memory[baseKS + k];
+                    if (c >= 32 && c <= 126) printf("%c", c);
+                    else printf(".");
+                }
+                printf("\"\n");
+            }
+
+            i = fin + 1; // Saltar el terminador nulo
+        }
+        printf("\n");
+    }
+
+    // === DISASSEMBLER DEL CÓDIGO ===
+    int cs_index = (VM->reg[CS] >> 16) & 0xFFFF;
+    baseCS = getBase(VM->segmentos[cs_index]);
+    tamCS  = getTam(VM->segmentos[cs_index]);
+    
+    if (tamCS <= 0) {
+        printf("[ERROR] Segmento de código vacío o no definido (CS=%d)\n", cs_index);
+        return;
+    }
 
     PosMemoria = baseCS;
-    PosFinal =  baseCS + tamCS;
+    PosFinal   = baseCS + tamCS;
 
     while (PosMemoria < PosFinal) {
+        PosInicial = PosMemoria;
+        ComponentesInstruccion(VM, PosMemoria, &instruc, &CantOp, &CodOp);
+        SeteoValorOp(VM, PosMemoria, &instruc);
 
-        PosInicial=PosMemoria;
-        ComponentesInstruccion(VM,PosMemoria,&instruc,&CantOp,&CodOp);
-        SeteoValorOp(VM,PosMemoria,&instruc);
+        PosMemoria += instruc.sizeA + instruc.sizeB + 1;
 
-        PosMemoria += instruc.sizeA+instruc.sizeB+1; // Posicion de la Siguiente instruccion
-        EscriboDissasembler(VM,VecFunciones,VecRegistros,CodOp,instruc,PosInicial,PosMemoria);
+        // Marcar entry point con ">"
+        if ((PosInicial - baseCS) == entry)
+            printf(">");
 
+        EscriboDissasembler(VM, VecFunciones, VecRegistros, CodOp, instruc, PosInicial, PosMemoria);
     }
 }
 
-
 void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegistros[CANTREG][4],
                          unsigned char CodOp, Instruccion instruc, int PosInicial, int PosFinal) {
-    // 1. Dirección física
+
+    // 1. Dirección física en formato [0000]
     printf("[%04X] ", PosInicial);
 
-    // 2. Bytes de la instrucción
-    for (int i = PosInicial; i < PosFinal; i++) {
+    // 2. Bytes de la instrucción en hexadecimal
+    for (int i = PosInicial; i < PosFinal; i++)
         printf("%02X ", VM->memory[i]);
-    }
-    // Completar hasta 4 bytes para alinear (opcional)
-    for (int i = PosFinal; i < PosInicial + 4; i++) {
+    
+    // Completar hasta 4 posiciones para alinear
+    for (int i = PosFinal; i < PosInicial + 4; i++)
         printf("   ");
-    }
 
-    printf("| ");
+    printf("| %-5s ", VecFunciones[CodOp]);
 
-    // 3. Mnemónico
-    printf("%s ", VecFunciones[CodOp]);
-
-    // 4. Operando A
+    // 3. Operando A
     if (instruc.sizeA) {
         if (instruc.sizeA == 1) { // Registro
-            int codReg;
-            DefinoRegistro(&codReg, instruc.valorA);
-            printf("%s", VecRegistros[codReg]);
+            int codReg, sec;
+            DefinoRegistro(&codReg, &sec, instruc.valorA);
+            MostrarPseudonimo(codReg, sec, VecRegistros);
         } else if (instruc.sizeA == 2) { // Inmediato
             printf("%d", instruc.valorA);
-        } else if (instruc.sizeA == 3) { // Memoria
-            int seg = (instruc.valorA & 0xFF0000) >> 16;
-            int off = instruc.valorA & 0xFFFF;
-            printf("[%s+%d]", VecRegistros[seg], off);
+        } else if (instruc.sizeA == 3) { // Memoria con modificadores
+            MostrarOperandoMemoria(VM, instruc.valorA, VecRegistros);
         }
     }
 
-    // 5. Operando B
+    // 4. Operando B
     if (instruc.sizeB) {
         printf(", ");
         if (instruc.sizeB == 1) { // Registro
-            int codReg;
-            DefinoRegistro(&codReg, instruc.valorB);
-            printf("%s", VecRegistros[codReg]);
+            int codReg, sec;
+            DefinoRegistro(&codReg, &sec, instruc.valorB);
+            MostrarPseudonimo(codReg, sec, VecRegistros);
         } else if (instruc.sizeB == 2) { // Inmediato
             printf("%d", instruc.valorB);
-        } else if (instruc.sizeB == 3) { // Memoria
-            int seg = (instruc.valorB & 0xFF0000) >> 16;
-            int off = instruc.valorB & 0xFFFF;
-            printf("[%s+%d]", VecRegistros[seg],off);
+        } else if (instruc.sizeB == 3) { // Memoria con modificadores
+            MostrarOperandoMemoria(VM, instruc.valorB, VecRegistros);
         }
     }
 
     printf("\n");
 }
 
+// -------------------- FUNCIONES AUXILIARES ------------------------//
 
+void MostrarPseudonimo(int codReg, int sec, char VecRegistros[CANTREG][4]) {
+    
+    if (codReg >= EAX && codReg <= EFX) {
+        switch (sec) {
+            case 0: printf("%s", VecRegistros[codReg]); break;     // EAX (32 bits)
+            case 1: printf("%cL", VecRegistros[codReg][1]); break; // AL (byte bajo)
+            case 2: printf("%cH", VecRegistros[codReg][1]); break; // AH (byte alto)
+            case 3: printf("%cX", VecRegistros[codReg][1]); break; // AX (16 bits)
+        }
+    } else {
+        // Para otros registros, mostrar nombre completo
+        printf("%s", VecRegistros[codReg]);
+    }
+}
+
+void MostrarOperandoMemoria(TVM *VM, int operando, char VecRegistros[CANTREG][4]) {
+
+    int sizeBits = (operando >> 30) & 0x3;
+    int size = sizeBits; // 00=long(4), 01=word(2), 10=byte(1), 11=reservado
+    
+    // Extraer registro base (bits 29-25, no 28-24)
+    int regBase = (operando >> 25) & 0x1F;
+    
+    // Offset sigue siendo bits 15-0
+    int offset = operando & 0xFFFF;
+    if (offset & 0x8000) 
+        offset |= 0xFFFF0000;
+    
+    // Mostrar modificador correcto
+    switch (sizeBits) {
+        case 0: printf("["); break;      // long (4 bytes) - por defecto
+        case 1: printf("w["); break;     // word (2 bytes)
+        case 2: printf("b["); break;     // byte (1 byte)
+        case 3: printf("?["); break;     // reservado
+    }
+    
+    printf("%s", VecRegistros[regBase]);
+    
+    if (offset > 0) {
+        printf("+%d", offset);
+    } else if (offset < 0) {
+        printf("%d", offset);
+    }
+    
+    printf("]");
+}

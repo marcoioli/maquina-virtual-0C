@@ -149,5 +149,8 @@ void DefinoAuxRegistro(int *AuxR,TVM VM, int CodReg);
 
 void guardarVMI(TVM *VM, char nombre[]);
 
-void LeoDissasembler(TVM * VM,char VecFunciones[CANTFUNC][5],char VecRegistros[CANTREG][4]);
-void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegistros[CANTREG][4], unsigned char CodOp, Instruccion instruc, int PosInicial, int PosFinal);
+void LeoDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegistros[CANTREG][4]);
+void EscriboDissasembler(TVM *VM, char VecFunciones[CANTFUNC][5], char VecRegistros[CANTREG][4], 
+                         unsigned char CodOp, Instruccion instruc, int PosInicial, int PosFinal);
+void MostrarPseudonimo(int codReg, int sec, char VecRegistros[CANTREG][4]);
+void MostrarOperandoMemoria(TVM *VM, int operando, char VecRegistros[CANTREG][4]);
