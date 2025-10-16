@@ -49,6 +49,8 @@ MAIN:   push bp
         call bst_add
         add sp, 8
 
+        sys 0xF
+
         push 30
         call btn_new
         add sp, 4

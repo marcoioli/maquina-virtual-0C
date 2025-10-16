@@ -65,6 +65,7 @@ typedef struct  {
     unsigned char memory[MEMORY_SIZE];
     int param_size;
     //errores
+    char *vmi_filename;
 } TVM;
 
 typedef struct {

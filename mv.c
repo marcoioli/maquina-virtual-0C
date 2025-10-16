@@ -1591,7 +1591,7 @@ void SYS(TVM *VM, Instruccion instruc) {
         }
         case 0x0F: {
             printf("\n=== Breakpoint alcanzado ===\n");
-            guardarVMI(VM, "imagen.vmi");
+            guardarVMI(VM, VM->vmi_filename);
             printf("Imagen guardada. Opciones:\n");
             printf("[g] continuar | [q] salir | [Enter] paso a paso\n");
 

@@ -11,58 +11,57 @@ int main(int argc, char *argv[]) {
     char nomarch[50];
     THeader header;
     int i;
+    char *vmx_filename = NULL;
+    char *vmi_filename = NULL;
+    bool disassembler_flag = false;
+    int params_start_index = -1;
 
-    
-    //vino el vmi
-    if (argc == 2 && strstr(argv[1], ".vmi")) {
-    // Solo archivo de imagen
-    leoVMI(&VM, argv[1]);  // Carga registros, segmentos y memoria desde la imagen
-    printf("Imagen VMI cargada. Continuando ejecución...\n");
-    leeIP(&VM);
-    return 0;
-    }
-    
-    // 1. Buscar si se pasó "-p"
-    int pos_p = -1;
-    i = 1;
-    while (i < argc && pos_p == -1) {
+    for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-p") == 0) {
-            pos_p = i;
+            params_start_index = i + 1;
+            break; // -p siempre es el último flag
+        } else if (strcmp(argv[i], "-d") == 0) {
+            disassembler_flag = true;
+        } else if (strstr(argv[i], ".vmx")) {
+            vmx_filename = argv[i];
+        } else if (strstr(argv[i], ".vmi")) {
+            vmi_filename = argv[i];
         }
-       i++;
+    }
+    if (!vmx_filename && !vmi_filename) {
+        fprintf(stderr, "Error: Se requiere un archivo de entrada (.vmx o .vmi).\n");
+        return 1;
+    }
+    if (vmi_filename) {
+        VM.vmi_filename = vmi_filename;
     }
 
-    // 2. Calcular cantidad de parámetros reales
-    int cantParams = 0;
-    if (pos_p != -1) {
-        cantParams = argc - (pos_p + 1);
-    }
+    if (vmx_filename) {
+        // --- Cargar y ejecutar un programa .vmx ---
+        int param_count = 0;
+        if (params_start_index != -1) {
+            param_count = argc - params_start_index;
+            cargaParametros(&VM, param_count, &argv[params_start_index]);
+        } else {
+            VM.param_size = 0;
+        }
+        leoArch(&VM, vmx_filename,param_count,&argv[params_start_index]);
+        //si estra -d muestra el dissasembler
+        if (disassembler_flag) {
+            inicializoVecFunciones(VecFunciones);
+            inicializoVecRegistros(VecRegistros);
+            LeoDissasembler(&VM, VecFunciones, VecRegistros);
+        }
 
-    // 3. Si hay parámetros, crear el Param Segment
-    if (cantParams > 0) {
-        cargaParametros(&VM, cantParams, &argv[pos_p + 1]);
+        printf("Comienza a leer IP \n");
+        leeIP(&VM);
+
     } else {
-        VM.param_size = 0;
+        // comienza a leer desde una imagen
+        leoVMI(&VM, vmi_filename);
+        printf("Imagen VMI cargada. Continuando ejecución...\n");
+        leeIP(&VM);
     }
-
-    strcpy(nomarch,argv[1]); //si ejecutas main.exe prueba.vmx se guarda prueba.vmc en nomarch
-    leoArch(&VM, argv[1], cantParams, &argv[pos_p + 1]);
-
-
-    inicializoVecFunciones(VecFunciones);
-    inicializoVecRegistros(VecRegistros);
-    
-
-    if (argc > 2) {
-        if (!strcmp(argv[2],"-d")) { //si ejecutas main.exe prueba.vmx -d se ejecuta el dissasembler
-            LeoDissasembler(&VM,VecFunciones,VecRegistros);
-        }
-    }
-
-    printf("Comienza a leer IP \n");
-    leeIP(&VM);
- 
-
     return 0;
 }
 
