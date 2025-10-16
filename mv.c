@@ -203,69 +203,54 @@ void pop(TVM *VM, unsigned int *valor) {
 }
 
 
-void iniciaRegs(TVM *VM, int entry_offset) {
-    // Inicializar registros que no existen por defecto
-    VM->reg[ES] = 0xFFFFFFFF;  // Por defecto no existe
-    VM->reg[SS] = 0xFFFFFFFF;  // Se configura en cargaSegmentos si existe
-    VM->reg[KS] = 0xFFFFFFFF;  // Se configura en cargaSegmentos si existe  
-    VM->reg[PS] = 0xFFFFFFFF;  // Se configura en cargaSegmentos si existe
+void iniciaRegs(TVM *VM, int entry_offset, int cantParams) {
     
-    // Inicializar registros de control
-    VM->reg[CC] = 0;
+    // 1. Poner registros de propósito general a 0
+    // (Asumiendo que TVM VM = {0}; ya se hizo en main)
     VM->reg[AC] = 0;
-    VM->reg[SP] = 0xFFFFFFFF;  // Se configura en cargaSegmentos si hay stack
-    VM->reg[BP] = 0xFFFFFFFF;  // No requiere inicialización especial
+    VM->reg[CC] = 0;
+    VM->reg[EAX] = 0;
+    VM->reg[EBX] = 0;
+    VM->reg[ECX] = 0;
+    VM->reg[EDX] = 0;
+    VM->reg[EEX] = 0;
+    VM->reg[EFX] = 0;
+    VM->reg[BP] = 0; 
+    
+    // Registros de segmento ya fueron inicializados por cargaSegmentos.
+    // NO los sobrescribas aquí.
 
-    // Validar que existe Code Segment
+    // 2. Inicializar IP
     if (VM->reg[CS] == 0xFFFFFFFF) {
-        printf("Error: no hay Code Segment para iniciar IP.\n");
-        return;
+         printf("Error: no hay Code Segment para iniciar IP.\n");
+         return;
     }
-
-    // Inicializar IP con entry point
-    // 16 bits más significativos: selector de segmento CS
-    // 16 bits menos significativos: entry_offset
     int csIndex = (int)(VM->reg[CS] >> 16);
     VM->reg[IP] = ((unsigned int)csIndex << 16) | entry_offset;
 
-    // Configurar pila si existe Stack Segment
+
+    // 3. Configurar la pila de la subrutina principal
     if (VM->reg[SS] != 0xFFFFFFFF) {
-        // Inicializar pila con valores por defecto
-        push(VM, 0xFFFFFFFF);  // dirección de retorno
-        push(VM, 0);           // argc dummy
-        push(VM, 0xFFFFFFFF);  // argv dummy
+        // SP ya fue inicializado por cargaSegmentos
         
-        // Si hay Param Segment, reemplazar con valores reales
+        push(VM, 0xFFFFFFFF); // Dirección de retorno (-1)
+
         if (VM->reg[PS] != 0xFFFFFFFF) {
-            unsigned int valor;
-            
-            // Buscar argc al final del PS
+            // Caso con parámetros
             int ps_index = (VM->reg[PS] >> 16) & 0xFFFF;
             int tamPS = VM->segmentos[ps_index].tam;
-            int basePS = VM->segmentos[ps_index].base;
             
-            // Leer argc desde los últimos 4 bytes del PS
-            int argc = 0;
-            for (int i = 0; i < 4; i++) {
-                argc = (argc << 8) | VM->memory[basePS + tamPS - 4 + i];
-            }
-            
-            // Calcular dirección del array argv (justo antes de argc)
-            int argv_offset = tamPS - 4 - (argc * 4);
+            int argv_offset = tamPS - (cantParams * 4);
             unsigned int argv_ptr = (ps_index << 16) | argv_offset;
             
-            // Reemplazar valores dummy con reales
-            pop(VM, &valor); // quitar argv dummy
-            pop(VM, &valor); // quitar argc dummy
-            pop(VM, &valor); // quitar retorno dummy
+            push(VM, cantParams); // argc real
+            push(VM, argv_ptr);   // argv real
             
-            push(VM, 0xFFFFFFFF);  // dirección de retorno
-            push(VM, argc);        // argc real
-            push(VM, argv_ptr);    // argv real
+        } else {
+            // Caso sin parámetros
+            push(VM, 0);          // argc = 0
+            push(VM, 0xFFFFFFFF); // argv = -1
         }
-        
-        // Inicializar BP = SP (apunta al frame actual)
-        VM->reg[BP] = VM->reg[SP];
     }
 }
 
@@ -491,84 +476,7 @@ void leoVMI(TVM *VM, char nomarch[]) {
     printf("Imagen cargada correctamente. Reanudando ejecución...\n");
 }
 
-/*void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]) {
-    FILE *archb;
-    THeader header = {0};
-    unsigned char b1, b2;
-    char id[6];
-    int i = 0;
 
-    archb = fopen(nomarch, "rb");
-    if (!archb) {
-        printf("No se pudo abrir el archivo %s\n", nomarch);
-        return;
-    }
-
-    fread(&header.c1, 1, 1, archb);
-    fread(&header.c2, 1, 1, archb);
-    fread(&header.c3, 1, 1, archb);
-    fread(&header.c4, 1, 1, archb);
-    fread(&header.c5, 1, 1, archb);
-    fread(&header.version, 1, 1, archb);
-    fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb);
-    header.tam = (b1 << 8) | b2;
-
-    sprintf(id, "%c%c%c%c%c", header.c1, header.c2, header.c3, header.c4, header.c5);
-
-   if (header.version == 1) {
-        printf("Detectada cabecera V1. Aplicando reglas de MV1.\n");
-        // En V1, los otros segmentos no están en el header.
-        // Los ponemos a 0 para que la lógica de defaults actúe.
-        header.data_size  = 0;
-        header.extra_size = 0;
-        header.stack_size = 0;
-        header.const_size = 0;
-        header.entry_offset = 0; // V1 siempre empieza en 0 [cite: 1103-1104]
-
-    } else if (header.version == 2) {
-        printf("Detectada cabecera V2.\n");
-        // V2: Leer el resto de la cabecera extendida
-        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.data_size  = (b1 << 8) | b2;
-        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.extra_size = (b1 << 8) | b2;
-        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.stack_size = (b1 << 8) | b2;
-        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.const_size = (b1 << 8) | b2;
-        fread(&b1, 1, 1, archb); fread(&b2, 1, 1, archb); header.entry_offset = (b1 << 8) | b2;
-    }
-    // Valores por defecto (si no se pudieron leer)
-    if (!header.data_size)  header.data_size  = 1024;
-    if (!header.extra_size) header.extra_size = 1024;
-    if (!header.stack_size) header.stack_size = 1024;
-    if (!header.const_size) header.const_size = 0;
-    if (!header.entry_offset) header.entry_offset = 0;
-
-    printf("id=%s version=%d tam=%d entry=%d\n",
-           id, header.version, header.tam, header.entry_offset);
-    printf("DATA=%d EXTRA=%d STACK=%d CONST=%d\n",
-           header.data_size, header.extra_size,
-           header.stack_size, header.const_size);
-
-    if (strcmp(id, "VMX25") != 0) {
-        printf("Archivo inválido.\n");
-        fclose(archb);
-        return;
-    }
-
-    if (cantParams > 0)
-        cargaParametros(VM, cantParams, parametros);
-    else
-        VM->param_size = 0;
-
-    cargaSegmentos(VM, header);
-    iniciaRegs(VM, header.entry_offset);
-
-    // Cargar código directamente en el segmento CODE
-    int baseCode = getBase(VM->segmentos[(VM->reg[CS] >> 16)]);
-    fread(&(VM->memory[baseCode]), 1, header.tam, archb);
-
-    fclose(archb);
-    printf("Archivo cargado correctamente.\n");
-} */
-// En mv.c, función leoArch
 void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]) {
     FILE *archb;
     THeader header = {0}; // Inicializar a ceros
@@ -646,7 +554,7 @@ void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]) {
     cargaSegmentos(VM, header);
     
     // IniciaRegs usará el entry_offset (0 para V1, N para V2)
-    iniciaRegs(VM, header.entry_offset);
+    iniciaRegs(VM, header.entry_offset, cantParams);
 
     // --- CARGA DE CÓDIGO Y CONSTANTES ---
     // El puntero del archivo está en la posición 8 (V1) o 18 (V2),

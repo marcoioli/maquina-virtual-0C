@@ -5,7 +5,7 @@
 
 
 int main(int argc, char *argv[]) {
-    TVM VM;
+    TVM VM = {0};
     char VecFunciones[CANTFUNC][5]; //5 Es la cantidad de caracteres que tiene como maximo el nombre de la funcion.
     char VecRegistros[CANTREG][4];
     char nomarch[50];
