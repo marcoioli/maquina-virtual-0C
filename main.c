@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
     int i;
     char *vmx_filename = NULL;
     char *vmi_filename = NULL;
-    bool disassembler_flag = false;
+    int disassembler_flag = false;
     int params_start_index = -1;
 
     for (int i = 1; i < argc; i++) {
@@ -41,11 +41,11 @@ int main(int argc, char *argv[]) {
         int param_count = 0;
         if (params_start_index != -1) {
             param_count = argc - params_start_index;
-            cargaParametros(&VM, param_count, &argv[params_start_index]);
         } else {
             VM.param_size = 0;
         }
-        leoArch(&VM, vmx_filename,param_count,&argv[params_start_index]);
+        char **params_ptr = (param_count > 0) ? &argv[params_start_index] : NULL;
+        leoArch(&VM, vmx_filename,param_count,params_ptr);
         //si estra -d muestra el dissasembler
         if (disassembler_flag) {
             inicializoVecFunciones(VecFunciones);

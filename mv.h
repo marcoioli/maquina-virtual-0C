@@ -90,7 +90,7 @@ void push(TVM *VM, unsigned int valor);
 void pop(TVM *VM, unsigned int *valor);
 
 void iniciaRegs(TVM *VM, int entry_offset, int cantParams);
-void cargaSegmentos(TVM *VM, THeader header);
+void cargaSegmentos(TVM *VM, THeader header, int cantParams, char *parametros[]);
 void cargaParametros(TVM *VM, int cant, char *params[]);
 void leoArch(TVM *VM, char nomarch[], int cantParams, char *parametros[]);
 void leoVMI(TVM *VM, char nomarch[]);
