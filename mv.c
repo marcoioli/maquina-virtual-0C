@@ -1370,7 +1370,7 @@ void POP(TVM *VM, Instruccion instruc) {
             break;
         }
         case 3: { // memoria
-            escribeMemoria(VM, instruc.valorA, val);
+            escribeMemoria(VM, VM->reg[OP1], val);
             break;
         }
         default:
@@ -1379,17 +1379,17 @@ void POP(TVM *VM, Instruccion instruc) {
 }
 
 void CALL(TVM *VM, Instruccion instruc) {
-    unsigned int retorno = VM->reg[IP] & 0xFFFF; // guardo solo offset
+    unsigned int retorno = VM->reg[IP]; // guardo solo offset
     push(VM, retorno);
 
     unsigned int destino = instruc.valorA & 0xFFFF;
-    VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | destino;
+    VM->reg[IP] = (VM->reg[CS] & 0xFFFF0000) | destino;
 }
 
 void RET(TVM *VM, Instruccion instruc) {
-    unsigned int dirRet = 0;
-    pop(VM, &dirRet);
-    VM->reg[IP] = (VM->reg[IP] & 0xFFFF0000) | (dirRet & 0xFFFF);
+    unsigned int direccion_retorno = 0;
+    pop(VM, &direccion_retorno);
+    VM->reg[IP] = direccion_retorno;
 }
 
 int resolverSaltoSeguro(TVM *VM, Instruccion instruc) {
@@ -1950,24 +1950,21 @@ void MostrarPseudonimo(int codReg, int sec, char VecRegistros[CANTREG][4]) {
 }
 
 void MostrarOperandoMemoria(TVM *VM, int operando, char VecRegistros[CANTREG][4]) {
-
-    int sizeBits = (operando >> 22) & 0x3;
-    int size = sizeBits; // 00=long(4), 01=word(2), 10=byte(1), 11=reservado
+// Extraer los campos según la especificación
+    int sizeBits = (operando >> 22) & 0b11; // Bits 23-22: Tamaño de la celda
+    int regBase  = (operando >> 16) & 0b11111; // Bits 20-16: Código de registro
+    int offset   = operando & 0xFFFF; // Bits 15-0: Offset
     
-    // Extraer registro base (bits 29-25, no 28-24)
-    int regBase = (operando >> 16) & 0x1F;
-    
-    // Offset sigue siendo bits 15-0
-    int offset = operando & 0xFFFF;
+    // Extender signo del offset
     if (offset & 0x8000) 
         offset |= 0xFFFF0000;
     
-    // Mostrar modificador correcto
+    // Mostrar modificador de tamaño
     switch (sizeBits) {
-        case 0: printf("["); break;      // long (4 bytes) - por defecto
-        case 2: printf("w["); break;     // word (2 bytes)
-        case 3: printf("b["); break;     // byte (1 byte)
-        default: printf("?["); break;     // reservado
+        case 0b00: printf("l["); break; // long (4 bytes)
+        case 0b10: printf("w["); break; // word (2 bytes)
+        case 0b11: printf("b["); break; // byte (1 byte)
+        default:   printf("?["); break; // No definido
     }
     
     printf("%s", VecRegistros[regBase]);
