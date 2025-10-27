@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (vmx_filename) {
-        // --- Cargar y ejecutar un programa .vmx ---
+        
         int param_count = 0;
         if (params_start_index != -1) {
             param_count = argc - params_start_index;
@@ -46,7 +46,7 @@ int main(int argc, char *argv[]) {
         }
         char **params_ptr = (param_count > 0) ? &argv[params_start_index] : NULL;
         leoArch(&VM, vmx_filename,param_count,params_ptr);
-        //si estra -d muestra el dissasembler
+        
         if (disassembler_flag) {
             inicializoVecFunciones(VecFunciones);
             inicializoVecRegistros(VecRegistros);

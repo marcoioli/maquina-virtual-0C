@@ -75,8 +75,8 @@ void inicializoVecRegistros(char VecRegistros[CANTREG][4]){
 
 
 void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga funciones[0] se ejecuta el sys
- // Instrucciones sin operandos
-    Funciones[0x0F] = STOP;  // No implementada aún
+
+    Funciones[0x0F] = STOP;  
     
     // Instrucciones con un operando  
     Funciones[0x00] = SYS;   
@@ -92,7 +92,7 @@ void declaraFunciones(vFunciones Funciones){//declara las funciones, cuando haga
     Funciones[0x0C] = POP;
     Funciones[0x0D] = CALL;
     Funciones[0x0E] = RET;
-    // Instrucciones con dos operandos 
+    
     Funciones[0x10] = MOV;   // 16 decimal
     Funciones[0x11] = ADD;   // 17 decimal  
     Funciones[0x12] = SUB;   // 18 decimal
@@ -136,14 +136,12 @@ void generaerror(int codigo) {
             break;
     }
 
-    exit(EXIT_FAILURE); // Aborta la ejecución
+    exit(EXIT_FAILURE); 
 }
 
 
 void push(TVM *VM, unsigned int valor) {
-
-
-
+    
     int segIndex = (VM->reg[SS] >> 16) & 0xFFFF;
     int sp = VM->reg[SP] & 0xFFFF;
     int baseSS = VM->segmentos[segIndex].base;
@@ -170,7 +168,7 @@ void push(TVM *VM, unsigned int valor) {
     VM->memory[dirFis + 2] = (valor >> 8)  & 0xFF;
     VM->memory[dirFis + 3] = (valor >> 0)  & 0xFF;
 
-    //actualiza sp
+    //actualiza s
     VM->reg[SP] = (segIndex << 16) | (sp & 0xFFFF);
 }
 
