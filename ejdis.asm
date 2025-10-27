@@ -1,3 +1,0 @@
-MOV EAX,5
-SHR EAX,1
-
