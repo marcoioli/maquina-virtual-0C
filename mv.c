@@ -160,6 +160,8 @@ void push(TVM *VM, unsigned int valor) {
     VM->reg[SP] = (segIndex << 16) | (sp & 0xFFFF);
 }
 
+
+
 void pop(TVM *VM, unsigned int *valor) {
     int segIndex = (VM->reg[SS] >> 16) & 0xFFFF;
     int sp = VM->reg[SP] & 0xFFFF;
@@ -1587,6 +1589,7 @@ void SYS(TVM *VM, Instruccion instruc) {
             }
 
             printf("\n");
+            fflush(stdout);
         }
         break;
         }
