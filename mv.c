@@ -734,33 +734,47 @@ void DefinoRegistro(int *codReg,int*sector, int op) {
     *sector = (op >> 6) & 0x03; 
 }
 
-void LeerSectorRegistro(int *AuxR,TVM * VM,unsigned char Sec,int CodReg){ 
-  int CorroSigno=0;
-  if (Sec == 1){
-        *AuxR = VM->reg[CodReg] & 0XFF;
-        CorroSigno = 24;
-    }
-  else if (Sec == 2){
-        *AuxR = (VM->reg[CodReg] & 0XFF00) >> 8;
-        CorroSigno = 16;
-    }
-  else if (Sec == 3){
-        *AuxR = VM->reg[CodReg] & 0XFFFF;
-        CorroSigno = 16;
-    }
-  else
-        *AuxR = VM->reg[CodReg];
+void LeerSectorRegistro(int *AuxR, TVM *VM, unsigned char Sec, int CodReg) {
+    int CorroSigno = 0;
 
-  *AuxR = *AuxR << CorroSigno;
-  *AuxR = *AuxR >> CorroSigno;
+    // APLICAR LÓGICA DE SECTOR SÓLO PARA EAX-EFX (10-15) Y SI Sec NO ES 0
+    if (CodReg >= 10 && CodReg <= 15 && Sec != 0) {
+        if (Sec == 1) { // AL
+            *AuxR = VM->reg[CodReg] & 0XFF;
+            CorroSigno = 24;
+        } else if (Sec == 2) { // AH
+            *AuxR = (VM->reg[CodReg] & 0XFF00) >> 8;
+            CorroSigno = 24; // <-- Bug corregido: AH es 1 byte, usa 24
+        } else if (Sec == 3) { // AX
+            *AuxR = VM->reg[CodReg] & 0XFFFF;
+            CorroSigno = 16;
+        }
+    } else {
+        // Para todos los demás registros (LAR, BP, IP, CS...)
+        // O para accesos de 32 bits (Sec == 0)
+        *AuxR = VM->reg[CodReg];
+    }
+
+    // Aplicar extensión de signo solo si leímos un sector parcial
+    if (CorroSigno > 0) {
+        *AuxR = *AuxR << CorroSigno;
+        *AuxR = *AuxR >> CorroSigno;
+    }
 }
 
 void escribirSectorRegistro(TVM *VM, int codReg, int sec, int nuevoValor) {
-    switch (sec) {
-        case 0: VM->reg[codReg] = nuevoValor; break;
-        case 1: VM->reg[codReg] = (VM->reg[codReg] & 0xFFFFFF00) | (nuevoValor & 0xFF); break;
-        case 2: VM->reg[codReg] = (VM->reg[codReg] & 0xFFFF00FF) | ((nuevoValor & 0xFF) << 8); break;
-        case 3: VM->reg[codReg] = (VM->reg[codReg] & 0xFFFF0000) | (nuevoValor & 0xFFFF); break;
+    
+    // APLICAR LÓGICA DE SECTOR SÓLO PARA EAX-EFX (10-15) Y SI Sec NO ES 0
+    if (codReg >= 10 && codReg <= 15 && sec != 0) {
+        switch (sec) {
+            case 1: VM->reg[codReg] = (VM->reg[codReg] & 0xFFFFFF00) | (nuevoValor & 0xFF); break; // AL
+            case 2: VM->reg[codReg] = (VM->reg[codReg] & 0xFFFF00FF) | ((nuevoValor & 0xFF) << 8); break; // AH
+            case 3: VM->reg[codReg] = (VM->reg[codReg] & 0xFFFF0000) | (nuevoValor & 0xFFFF); break; // AX
+        }
+    } else {
+        // Para todos los demás registros (LAR, BP, IP, CS...)
+        // O para accesos de 32 bits (Sec == 0)
+        VM->reg[codReg] = nuevoValor;
     }
 }
 
