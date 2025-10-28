@@ -898,7 +898,9 @@ int leerMemoria(TVM *VM, int OP) {
     for (int i = 0; i < size; i++) {
         valor = (valor << 8) | (VM->memory[dirFis + i] & 0xFF);
     }
-
+    if (size < 4) {
+        valor = extenderSigno(valor, size); 
+    }
     // Cargar MBR
     VM->reg[MBR] = valor;
 
@@ -1956,14 +1958,18 @@ void MostrarPseudonimo(int codReg, int sec, char VecRegistros[CANTREG][4]) {
 
 
 void MostrarOperandoMemoria(TVM *VM, int operando, char VecRegistros[CANTREG][4]) {
-    // Extraer campos según MV2
-    int sizeBits = (operando >> 30) & 0b11;        // Bits 31-30: tamaño
-    int regBase  = (operando >> 25) & 0b11111;     // Bits 29-25: registro (0-31)
-    int modoAbs  = (operando >> 24) & 0b1;         // Bit 24: 0=relativo, 1=absoluto
-    int offset   = (operando & 0xFFFF);            // Bits 23-8: offset (16 bits)
+   
+    
+    int sizeBits = (operando >> 22) & 0b11;      // Bits 23-22: tamaño
+    int regBase  = (operando >> 16) & 0b11111;   // Bits 20-16: registro (0-31)
+    // int modoAbs  = ... (Este bit no existe en el layout de 3 bytes)
+    int offset   = (operando & 0xFFFF);           // Bits 15-0: offset (16 bits)
+    // ------------------------------------
 
-    // Extender signo del offset (solo si es relativo)
-    if (!modoAbs && (offset & 0x8000)) {
+
+    // Extender signo del offset
+    // (El modoAbs ya no existe, el offset siempre es relativo al registro)
+    if (offset & 0x8000) {
         offset |= 0xFFFF0000;
     }
 
@@ -1975,23 +1981,18 @@ void MostrarOperandoMemoria(TVM *VM, int operando, char VecRegistros[CANTREG][4]
         default:   printf("?["); break; // No definido
     }
 
-    if (modoAbs) {
-        // Modo absoluto: no hay registro, solo offset
-        printf("0x%04X", offset);
+    // Modo relativo: registro + offset
+    if (regBase < CANTREG) {
+        printf("%s", VecRegistros[regBase]);
     } else {
-        // Modo relativo: registro + offset
-        if (regBase < CANTREG) {
-            printf("%s", VecRegistros[regBase]);
-        } else {
-            printf("R%d", regBase);
-        }
-
-        if (offset > 0) {
-            printf("+%d", offset);
-        } else if (offset < 0) {
-            printf("%d", offset);
-        }
+        printf("R%d", regBase);
     }
 
+    if (offset > 0) {
+        printf("+%d", offset);
+    } else if (offset < 0) {
+        printf("%d", offset);
+    }
+    
     printf("]");
 }
