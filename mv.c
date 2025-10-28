@@ -140,35 +140,23 @@ void generaerror(int codigo) {
 }
 
 
+
 void push(TVM *VM, unsigned int valor) {
-    
     int segIndex = (VM->reg[SS] >> 16) & 0xFFFF;
     int sp = VM->reg[SP] & 0xFFFF;
     int baseSS = VM->segmentos[segIndex].base;
     int tamSS  = VM->segmentos[segIndex].tam;
-
-    if (VM->reg[SS] == 0xFFFFFFFF) {
-    generaerror(STACK_OVERFLOW);
-    return;
-    }
-
     sp -= 4;
-
     if (sp < 0) {
-    printf("[ERROR] Stack overflow (SP fuera de rango)\n");
-    generaerror(STACK_OVERFLOW);
-    return;
+        printf("[ERROR] Stack overflow (SP fuera de rango)\n");
+        generaerror(STACK_OVERFLOW);
+        return;
     }
-
     int dirFis = baseSS + sp;
-
-    // escribe en memoria
     VM->memory[dirFis + 0] = (valor >> 24) & 0xFF;
     VM->memory[dirFis + 1] = (valor >> 16) & 0xFF;
     VM->memory[dirFis + 2] = (valor >> 8)  & 0xFF;
     VM->memory[dirFis + 3] = (valor >> 0)  & 0xFF;
-
-    //actualiza s
     VM->reg[SP] = (segIndex << 16) | (sp & 0xFFFF);
 }
 
@@ -1617,17 +1605,19 @@ void SYS(TVM *VM, Instruccion instruc) {
             }
             break;
         }
-        case 3: {
-           int logica, segmento, offset, tamMax;
+case 3: {
+            int logica, segmento, offset;
+            unsigned int tamMax; // Usar unsigned para la comparación
 
             // Obtener dirección lógica destino desde EDX
             logica   = VM->reg[EDX];
             segmento = (logica >> 16) & 0xFFFF;
             offset   = logica & 0xFFFF;
 
-            // Obtener cantidad máxima de caracteres desde ECX (parte baja)
+            //desde ecx
             tamMax = VM->reg[ECX] & 0xFFFF;
-            if (tamMax == -1 || tamMax > 255)
+            
+            if (tamMax == 0 || tamMax == 0xFFFF || tamMax > 255)
                 tamMax = 255;
 
             char buffer[1024];
@@ -1635,18 +1625,19 @@ void SYS(TVM *VM, Instruccion instruc) {
             fflush(stdout);
             fgets(buffer, sizeof(buffer), stdin);
 
-          
+            
             size_t len = strlen(buffer);
-            if (len > 0 && buffer[len - 1] == '\n')
+            if (len > 0 && buffer[len - 1] == '\n') {
                 buffer[len - 1] = '\0';
-
-       
-            if ((int)len > tamMax)
-                buffer[tamMax] = '\0';
-
-            int realLen = strlen(buffer);
-
-           
+                len--; // <-- Actualizar 'len' para que refleje la longitud real
+            }
+            int realLen = (int)len; // Esta es la longitud real
+            
+            if (realLen > tamMax) {
+                buffer[tamMax] = '\0'; 
+                realLen = tamMax;     
+            }
+            
             for (int i = 0; i < realLen; i++) {
                 int dirFis = getDirfisica(VM, offset + i, segmento, 1);
                 if (dirFis == -1) {
@@ -1656,7 +1647,6 @@ void SYS(TVM *VM, Instruccion instruc) {
                 VM->memory[dirFis] = (unsigned char) buffer[i];
             }
 
-            // 5️⃣ Agregar terminador nulo (0x00)
             int dirFis = getDirfisica(VM, offset + realLen, segmento, 1);
             if (dirFis != -1)
                 VM->memory[dirFis] = 0x00;
@@ -1677,7 +1667,6 @@ void SYS(TVM *VM, Instruccion instruc) {
             }
 
             // Imprimir carácter a carácter hasta encontrar '\0'
-            printf("[SYS4 OUTPUT]: ");
             while (1) {
                 int dirFis = getDirfisica(VM, offset, segmento, 1);
                 if (dirFis == -1) {
