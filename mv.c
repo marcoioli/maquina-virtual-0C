@@ -202,6 +202,7 @@ void iniciaRegs(TVM *VM, int entry_offset, int cantParams) {
     VM->reg[EEX] = 0;
     VM->reg[EFX] = 0;
     VM->reg[BP] = 0; 
+
     
     // Registros de segmento ya fueron inicializados por cargaSegmentos.
     // NO los sobrescribas aquí.
@@ -555,18 +556,16 @@ int getTam(TSegmento seg) {
 
 
 int getDirfisica(TVM *VM, int offset, int segmento, int size) {
-    int base, tam;
-
     if (segmento < 0 || segmento >= SEG_TABLE) {
         generaerror(ERROR_SEGMENTO);
         return -1;
     }
 
-    base = VM->segmentos[segmento].base;
-    tam = VM->segmentos[segmento].tam;
+    int base = VM->segmentos[segmento].base;
+    int tam  = VM->segmentos[segmento].tam;
 
-    // Validar que el acceso completo esté dentro del segmento
-    if (offset < 0 || (offset + size - 1) >= tam) {
+    // Validar que todo el acceso (offset + size - 1) esté dentro del segmento
+    if (offset < 0 || (offset + size) > tam) {
         generaerror(ERROR_SEGMENTO);
         return -1;
     }
@@ -770,7 +769,9 @@ void escribeMemoria(TVM *VM, int OP, int valor) {
     int size; // tamaño de la celda (1, 2 o 4 bytes)
 
     //  Extraer tamaño de celda desde los 2 bits más significativos
-    sizeBits = (OP >> 30) & 0x3;  // bits 31-30
+    //sizeBits = (OP >> 30) & 0x3;  // bits 31-30
+    
+    sizeBits = (OP >> 22) & 0x3;  // bits 23-22
 
     switch (sizeBits) {
     case 0: size = 4; break; // long
@@ -826,7 +827,7 @@ void escribeMemoria(TVM *VM, int OP, int valor) {
 
     // Escribir valor en memoria (big-endian)
     for (int i = 0; i < size; i++)
-        VM->memory[dirFis + (size - 1 - i)] = (valor >> (8 * i)) & 0xFF;
+        VM->memory[dirFis + i] = (valor >> (8 * (size - 1 - i))) & 0xFF;
 }
 
 int leerMemoria(TVM *VM, int OP) {
@@ -834,7 +835,9 @@ int leerMemoria(TVM *VM, int OP) {
     int size;
     int valor = 0;
 
-    sizeBits = (OP >> 30) & 0x3;
+    //sizeBits = (OP >> 30) & 0x3;
+
+    sizeBits = (OP >> 22) & 0x3;  // bits 23-22
     
     switch (sizeBits) {
         case 0: size = 4; break; // long
@@ -1605,7 +1608,7 @@ void SYS(TVM *VM, Instruccion instruc) {
             }
             break;
         }
-case 3: {
+        case 3: {
             int logica, segmento, offset;
             unsigned int tamMax; // Usar unsigned para la comparación
 
@@ -1936,16 +1939,19 @@ void MostrarPseudonimo(int codReg, int sec, char VecRegistros[CANTREG][4]) {
     }
 }
 
+
 void MostrarOperandoMemoria(TVM *VM, int operando, char VecRegistros[CANTREG][4]) {
-// Extraer los campos según la especificación
-    int sizeBits = (operando >> 22) & 0b11; // Bits 23-22: Tamaño de la celda
-    int regBase  = (operando >> 16) & 0b11111; // Bits 20-16: Código de registro
-    int offset   = operando & 0xFFFF; // Bits 15-0: Offset
-    
-    // Extender signo del offset
-    if (offset & 0x8000) 
+    // Extraer campos según MV2
+    int sizeBits = (operando >> 30) & 0b11;        // Bits 31-30: tamaño
+    int regBase  = (operando >> 25) & 0b11111;     // Bits 29-25: registro (0-31)
+    int modoAbs  = (operando >> 24) & 0b1;         // Bit 24: 0=relativo, 1=absoluto
+    int offset   = (operando & 0xFFFF);            // Bits 23-8: offset (16 bits)
+
+    // Extender signo del offset (solo si es relativo)
+    if (!modoAbs && (offset & 0x8000)) {
         offset |= 0xFFFF0000;
-    
+    }
+
     // Mostrar modificador de tamaño
     switch (sizeBits) {
         case 0b00: printf("l["); break; // long (4 bytes)
@@ -1953,14 +1959,24 @@ void MostrarOperandoMemoria(TVM *VM, int operando, char VecRegistros[CANTREG][4]
         case 0b11: printf("b["); break; // byte (1 byte)
         default:   printf("?["); break; // No definido
     }
-    
-    printf("%s", VecRegistros[regBase]);
-    
-    if (offset > 0) {
-        printf("+%d", offset);
-    } else if (offset < 0) {
-        printf("%d", offset);
+
+    if (modoAbs) {
+        // Modo absoluto: no hay registro, solo offset
+        printf("0x%04X", offset);
+    } else {
+        // Modo relativo: registro + offset
+        if (regBase < CANTREG) {
+            printf("%s", VecRegistros[regBase]);
+        } else {
+            printf("R%d", regBase);
+        }
+
+        if (offset > 0) {
+            printf("+%d", offset);
+        } else if (offset < 0) {
+            printf("%d", offset);
+        }
     }
-    
+
     printf("]");
 }
