@@ -148,7 +148,6 @@ void push(TVM *VM, unsigned int valor) {
     int tamSS  = VM->segmentos[segIndex].tam;
     sp -= 4;
     if (sp < 0) {
-        printf("[ERROR] Stack overflow (SP fuera de rango)\n");
         generaerror(STACK_OVERFLOW);
         return;
     }
@@ -170,7 +169,6 @@ void pop(TVM *VM, unsigned int *valor) {
 
     // 1️⃣ Verificar underflow
     if  (sp >= tamSS) {
-        printf("[ERROR] Stack underflow (SP fuera de rango)\n");
         generaerror(STACK_UNDERFLOW);
         return;
     }
@@ -222,7 +220,7 @@ void iniciaRegs(TVM *VM, int entry_offset, int cantParams) {
     if (VM->reg[SS] != 0xFFFFFFFF) {
         // SP ya fue inicializado por cargaSegmentos
         
-        push(VM, 0xFFFFFFFF); // Dirección de retorno (-1)
+        //push(VM, 0xFFFFFFFF); // Dirección de retorno (-1)
 
     if (VM->reg[PS] != 0xFFFFFFFF) {
         int ps_index = (VM->reg[PS] >> 16) & 0xFFFF;
