@@ -1641,7 +1641,6 @@ void SYS(TVM *VM, Instruccion instruc) {
                 tamMax = 255;
 
             char buffer[1024];
-            printf("[SYS3 INPUT]: ");
             fflush(stdout);
             fgets(buffer, sizeof(buffer), stdin);
 
@@ -1670,8 +1669,6 @@ void SYS(TVM *VM, Instruccion instruc) {
             int dirFis = getDirfisica(VM, offset + realLen, segmento, 1);
             if (dirFis != -1)
                 VM->memory[dirFis] = 0x00;
-
-            printf("[SYS3] %d caracteres leídos y almacenados en memoria.\n", realLen);
             break;
         }
         case 4: {
@@ -1701,7 +1698,7 @@ void SYS(TVM *VM, Instruccion instruc) {
                 offset++; // avanzar
             }
 
-            printf("\n");
+        
             break;
         }
         case 7: {
